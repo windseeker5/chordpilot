@@ -22,28 +22,30 @@ sudo systemctl enable ollama
 
 For **guitar chord generation**, here are your options:
 
-### **Recommended: Llama 3.1 8B** ⭐
+### **Recommended: DeepSeek-R1 7B** ⭐⭐⭐
 ```bash
-ollama pull llama3.1:8b
+ollama pull deepseek-r1:7b
 ```
 **Why:**
-- Best balance of speed and quality
-- 8GB RAM usage
-- Generates accurate chords for popular songs
-- Fast enough (30-45 seconds)
+- **Newest reasoning model** (released Jan 2025)
+- **Best at following ChordPro format**
+- **Reasoning capability** understands song structure
+- **GPU optimized** - 5-10 seconds on RTX 3070 8GB
+- **Better than Llama 3.1** for structured generation tasks
 
 ---
 
 ### **Alternative Options:**
 
-| Model | RAM | Speed | Quality | Command |
-|-------|-----|-------|---------|---------|
-| **Llama 3.1 8B** ⭐ | 8GB | Medium | Excellent | `ollama pull llama3.1:8b` |
-| **Mistral 7B** | 7GB | Fast | Good | `ollama pull mistral:7b` |
-| **Qwen 2.5 7B** | 7GB | Fast | Very Good | `ollama pull qwen2.5:7b` |
-| **Llama 3.1 70B** | 40GB | Slow | Best | `ollama pull llama3.1:70b` |
+| Model | RAM | Speed (RTX 3070) | Quality | Command |
+|-------|-----|------------------|---------|---------|
+| **DeepSeek-R1 7B** ⭐⭐⭐ | 7GB | ⚡ 5-10s | Excellent | `ollama pull deepseek-r1:7b` |
+| **Qwen 2.5 7B** ⭐⭐ | 7GB | ⚡ 5-10s | Very Good | `ollama pull qwen2.5:7b` |
+| **Llama 3.1 8B** | 8GB | ⚡ 8-12s | Good | `ollama pull llama3.1:8b` |
+| **Mistral 7B** | 7GB | ⚡ 5-10s | Good | `ollama pull mistral:7b` |
+| **Llama 3.1 70B** | 40GB | 🐌 30-60s | Best | `ollama pull llama3.1:70b` |
 
-**My recommendation:** Start with **llama3.1:8b**
+**My recommendation:** Start with **deepseek-r1:7b** (newest and best for ChordPro)
 
 ---
 
@@ -58,7 +60,7 @@ ollama pull llama3.1:8b
 
 3. **Configure:**
    - **Ollama URL**: `http://localhost:11434` (default)
-   - **Model**: `llama3.1:8b`
+   - **Model**: `deepseek-r1:7b` (or `llama3.1:8b`)
    - **Enable**: ✅ Check the box
 
 4. **Test Connection** → Should show "Connected successfully!"
@@ -71,7 +73,7 @@ ollama pull llama3.1:8b
 
 ```bash
 # Quick test
-ollama run llama3.1:8b "Generate a simple chord progression for a song in the key of C major"
+ollama run deepseek-r1:7b "Generate a simple chord progression for a song in the key of C major"
 ```
 
 Should respond quickly with chord suggestions.
@@ -143,11 +145,11 @@ yay -S ollama
 # 2. Start service
 sudo systemctl start ollama
 
-# 3. Download model
-ollama pull llama3.1:8b
+# 3. Download model (DeepSeek-R1 recommended for RTX 3070)
+ollama pull deepseek-r1:7b
 
 # 4. Test
-ollama run llama3.1:8b "Hi"
+ollama run deepseek-r1:7b "Hi"
 
 # 5. Configure in app at http://localhost:5000/settings
 ```
