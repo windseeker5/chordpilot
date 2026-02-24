@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Guitar Practice App{% endblock %}</title>
+
+    <!-- Tailwind CSS + DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* TV-optimized styles */
+        body {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        /* Smooth scrolling for auto-scroll feature */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Chord positioning styles */
+        .chord-line {
+            position: relative;
+            min-height: 3rem;
+        }
+
+        .chord-segment {
+            margin-right: 0.25rem;
+        }
+
+        /* Make sure chords don't overlap */
+        .chord {
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* Large, readable text for TV display */
+        .song-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Verse and chorus styling */
+        .verse {
+            margin-bottom: 2rem;
+        }
+
+        .chorus {
+            margin-bottom: 2rem;
+            padding-left: 2rem;
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* Sidebar styles */
+        .drawer-side {
+            z-index: 1000;
+        }
+    </style>
+
+    {% block extra_styles %}{% endblock %}
+</head>
+<body class="bg-base-100 min-h-screen">
+    <div class="drawer lg:drawer-open">
+        <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
+
+        <div class="drawer-content flex flex-col">
+            <!-- Navigation Bar -->
+            <div class="navbar bg-base-200 shadow-lg">
+                <div class="flex-none lg:hidden">
+                    <label for="sidebar-drawer" class="btn btn-square btn-ghost">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </label>
+                </div>
+                <div class="flex-1">
+                    <a href="/" class="btn btn-ghost normal-case text-2xl">
+                        <i data-lucide="music" class="w-8 h-8 mr-2"></i>
+                        Guitar Practice
+                    </a>
+                </div>
+                <div class="flex-none">
+                    {% block nav_buttons %}{% endblock %}
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <main class="flex-1 p-4">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="drawer-side">
+            <label for="sidebar-drawer" class="drawer-overlay"></label>
+            <aside class="bg-base-200 w-64 min-h-full">
+                <div class="p-4">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i data-lucide="guitar" class="w-6 h-6 mr-2"></i>
+                        Menu
+                    </h2>
+                    <ul class="menu text-lg">
+                        <li>
+                            <a href="/" class="{% if request.endpoint == 'index' %}active{% endif %}">
+                                <i data-lucide="home" class="w-5 h-5"></i>
+                                Home
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/library" class="{% if request.endpoint == 'library' %}active{% endif %}">
+                                <i data-lucide="library" class="w-5 h-5"></i>
+                                Library
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/settings" class="{% if request.endpoint == 'settings_page' %}active{% endif %}">
+                                <i data-lucide="settings" class="w-5 h-5"></i>
+                                Settings
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Initialize Lucide Icons -->
+    <script>
+        lucide.createIcons();
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

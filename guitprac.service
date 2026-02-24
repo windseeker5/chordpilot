@@ -1,0 +1,16 @@
+[Unit]
+Description=Guitar Practice App
+After=network.target
+
+[Service]
+Type=simple
+User=kdresdell
+WorkingDirectory=/home/kdresdell/Documents/DEV/guitprac
+ExecStart=/home/kdresdell/Documents/DEV/guitprac/venv/bin/python -m flask run --host=0.0.0.0 --port=5000
+Environment="FLASK_APP=app.py"
+Environment="FLASK_ENV=production"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

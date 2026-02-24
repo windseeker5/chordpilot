@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{{ song.title }} - Guitar Practice App{% endblock %}
+
+{% block nav_buttons %}
+<a href="/" class="btn btn-ghost btn-lg">
+    <i data-lucide="arrow-left" class="w-6 h-6"></i>
+    Back
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-5xl p-8">
+    <!-- Song Info -->
+    <div class="mb-8 text-center">
+        <h1 class="text-5xl font-bold mb-4">{{ parsed.title }}</h1>
+        <p class="text-3xl text-base-content/70 mb-2">{{ parsed.artist }}</p>
+        {% if parsed.key %}
+        <div class="badge badge-secondary badge-lg text-xl">Key of {{ parsed.key }}</div>
+        {% endif %}
+    </div>
+
+    <!-- Audio Player Controls -->
+    <div class="card bg-base-200 shadow-xl mb-8">
+        <div class="card-body">
+            {% if audio_url %}
+            <div class="flex flex-col items-center gap-4">
+                <!-- Audio Element -->
+                <audio id="audio-player" class="w-full" controls preload="auto">
+                    <source src="{{ audio_url }}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+
+                <!-- Control Buttons -->
+                <div class="flex gap-4">
+                    <button id="play-btn" class="btn btn-primary btn-lg">
+                        <i data-lucide="play" class="w-8 h-8"></i>
+                        Play
+                    </button>
+                    <button id="pause-btn" class="btn btn-secondary btn-lg" disabled>
+                        <i data-lucide="pause" class="w-8 h-8"></i>
+                        Pause
+                    </button>
+                    <button id="restart-btn" class="btn btn-accent btn-lg">
+                        <i data-lucide="rotate-ccw" class="w-8 h-8"></i>
+                        Restart
+                    </button>
+                </div>
+
+                <!-- Auto-scroll Toggle -->
+                <div class="form-control">
+                    <label class="label cursor-pointer gap-4">
+                        <span class="label-text text-xl">Auto-scroll</span>
+                        <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-lg" checked />
+                    </label>
+                </div>
+
+                <!-- Progress Info -->
+                <div id="progress-info" class="text-lg text-base-content/70">
+                    <span id="current-time">0:00</span> / <span id="duration">0:00</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                <div>
+                    <h3 class="font-bold text-xl">Audio not available</h3>
+                    <div class="text-lg">This song doesn't have an audio file yet. You can still view the chords below.</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Chords and Lyrics -->
+    <div id="song-content" class="song-content bg-base-100 rounded-lg p-8 shadow-inner">
+        {{ parsed.html | safe }}
+    </div>
+
+    <!-- Spacing at bottom for scrolling -->
+    <div class="h-screen"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/player.js') }}"></script>
+<script>
+    // Reinitialize icons
+    lucide.createIcons();
+
+    // Initialize player when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof initPlayer === 'function') {
+            initPlayer();
+        }
+    });
+</script>
+{% endblock %}

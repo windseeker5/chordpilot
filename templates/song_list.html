@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Song List - Guitar Practice App{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-8">
+    <h1 class="text-5xl font-bold mb-8 text-center">My Songs</h1>
+
+    {% if songs %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for song in songs %}
+        <div class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow">
+            <div class="card-body">
+                <h2 class="card-title text-3xl">
+                    <i data-lucide="music" class="w-8 h-8"></i>
+                    {{ song.title }}
+                </h2>
+                <p class="text-xl text-base-content/70">
+                    <i data-lucide="user" class="w-5 h-5 inline"></i>
+                    {{ song.artist }}
+                </p>
+
+                {% if song.key %}
+                <div class="badge badge-secondary badge-lg text-lg">
+                    Key of {{ song.key }}
+                </div>
+                {% endif %}
+
+                <div class="card-actions justify-end mt-4">
+                    <a href="/song/{{ song.id }}" class="btn btn-primary btn-lg">
+                        <i data-lucide="play" class="w-6 h-6"></i>
+                        Play
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info text-xl">
+        <i data-lucide="info" class="w-8 h-8"></i>
+        <div>
+            <h3 class="font-bold text-2xl">No songs yet</h3>
+            <div class="text-lg">Add songs to the <code class="bg-base-300 px-2 py-1 rounded">static/songs/</code> directory and update <code class="bg-base-300 px-2 py-1 rounded">songs.json</code></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Reinitialize icons after page load
+    document.addEventListener('DOMContentLoaded', () => {
+        lucide.createIcons();
+    });
+</script>
+{% endblock %}
