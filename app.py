@@ -8,11 +8,11 @@ import os
 import json
 import threading
 from flask import Flask, render_template, jsonify, request, redirect, url_for
-from chordpro_parser import parse_chordpro
-import database as db
-from youtube_downloader import search_youtube, download_audio, check_ytdlp_installed
-from chords_fetcher import search_ultimate_guitar, fetch_chords_from_url, convert_to_chordpro, search_chords_simple
-from artist_lookup import get_song_metadata, parse_search_query
+from utils.chordpro_parser import parse_chordpro
+from utils import database as db
+from utils.youtube_downloader import search_youtube, download_audio, check_ytdlp_installed
+from utils.chords_fetcher import search_ultimate_guitar, fetch_chords_from_url, convert_to_chordpro, search_chords_simple
+from utils.artist_lookup import get_song_metadata, parse_search_query
 
 
 app = Flask(__name__)
@@ -371,7 +371,7 @@ def save_manual_chords(song_id):
     print(f"[APP] Converting {len(raw_chords)} characters of raw chords to ChordPro")
 
     # Convert raw text to ChordPro
-    from chord_converter import convert_raw_to_chordpro
+    from utils.chord_converter import convert_raw_to_chordpro
 
     try:
         chordpro_content = convert_raw_to_chordpro(
@@ -544,7 +544,7 @@ def test_ollama_connection():
 @app.route('/api/ollama-status')
 def check_ollama_status():
     """Check if Ollama AI is available for chord generation"""
-    from chords_fetcher import check_ollama_available, is_ollama_enabled, get_ollama_url
+    from utils.chords_fetcher import check_ollama_available, is_ollama_enabled, get_ollama_url
 
     enabled = is_ollama_enabled()
     available = check_ollama_available()

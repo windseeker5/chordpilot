@@ -239,7 +239,7 @@ def convert_to_chordpro(raw_content: str, title: str, artist: str) -> str:
     key = detect_key(raw_content)
 
     # Use the improved chord converter
-    from chord_converter import convert_raw_to_chordpro
+    from utils.chord_converter import convert_raw_to_chordpro
 
     result = convert_raw_to_chordpro(
         raw_text=raw_content,
@@ -521,7 +521,7 @@ def search_chords_multi_source(query: str) -> List[Dict]:
     print(f"[CHORDS] Multi-source search: '{query}'")
     print(f"[CHORDS] ═══════════════════════════════════════════════════════")
 
-    from artist_lookup import parse_search_query
+    from utils.artist_lookup import parse_search_query
     parsed = parse_search_query(query)
     title = parsed['title']
     artist = parsed['artist'] or 'Unknown'
