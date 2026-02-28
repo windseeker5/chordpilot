@@ -1,87 +1,86 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - Guitar Practice App{% endblock %}
+{% block title %}Settings — ChordPilot{% endblock %}
+{% block page_title %}Settings{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-8">
-    <h1 class="text-5xl font-bold mb-8">Settings</h1>
+<div class="max-w-2xl mx-auto">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold">Settings</h1>
+        <p class="text-base-content/60 mt-1">Configure your ChordPilot experience</p>
+    </div>
 
-    <!-- AI Server Settings -->
-    <div class="card bg-base-200 shadow-xl mb-6">
+    <!-- AI Server card -->
+    <div class="card bg-base-200 shadow-lg mb-6">
         <div class="card-body">
-            <h2 class="card-title text-3xl mb-4">
-                <i data-lucide="cpu" class="w-8 h-8"></i>
-                Ollama AI Server Configuration
+            <h2 class="card-title text-xl gap-2">
+                <i data-lucide="cpu" class="w-5 h-5 text-primary"></i>
+                Ollama AI Server
             </h2>
-
-            <p class="text-lg mb-6">
-                Configure your AI server for automatic chord generation when online sources don't have a song.
-                Ollama can run locally or on a remote home server.
+            <p class="text-base-content/60 text-sm mb-4">
+                Configure the AI server for automatic chord generation when online sources don't have a song.
             </p>
 
-            <!-- Enable/Disable -->
-            <div class="form-control mb-6">
-                <label class="cursor-pointer label justify-start gap-4">
-                    <input id="ollamaEnabled" type="checkbox" class="toggle toggle-primary toggle-lg"
+            <!-- Enable toggle -->
+            <div class="form-control mb-5">
+                <label class="cursor-pointer flex items-center gap-3">
+                    <input id="ollamaEnabled" type="checkbox" class="toggle toggle-primary"
                            {{ 'checked' if settings.ollama_enabled }} />
-                    <span class="label-text text-2xl font-semibold">Enable AI Chord Generation</span>
-                </label>
-                <label class="label">
-                    <span class="label-text-alt text-base">When enabled, Ollama will generate chords for songs not found on Songsterr or Ultimate Guitar</span>
+                    <div>
+                        <span class="font-semibold">Enable AI Chord Generation</span>
+                        <p class="text-xs text-base-content/50">Ollama generates chords when Songsterr &amp; UG fail</p>
+                    </div>
                 </label>
             </div>
 
-            <div id="ollamaSettings" class="{{ 'opacity-50 pointer-events-none' if not settings.ollama_enabled }}">
-                <!-- Ollama URL -->
+            <div id="ollamaSettings" class="{{ 'opacity-40 pointer-events-none' if not settings.ollama_enabled }}">
+
+                <!-- URL field -->
                 <div class="form-control mb-4">
                     <label class="label">
-                        <span class="label-text text-xl font-semibold">Ollama Server URL</span>
+                        <span class="label-text font-medium">Ollama Server URL</span>
+                        <span class="label-text-alt text-xs">e.g. http://192.168.1.100:11434</span>
                     </label>
                     <input id="ollamaUrl" type="text"
                            value="{{ settings.ollama_url }}"
-                           placeholder="http://192.168.1.100:11434"
-                           class="input input-bordered text-lg" />
-                    <label class="label">
-                        <span class="label-text-alt">Example: <code>http://homeserver.local:11434</code> or <code>http://192.168.1.100:11434</code></span>
-                    </label>
+                           placeholder="http://localhost:11434"
+                           class="input input-bordered w-full" />
                 </div>
 
-                <!-- Model Selection -->
-                <div class="form-control mb-6">
+                <!-- Model dropdown -->
+                <div class="form-control mb-5">
                     <label class="label">
-                        <span class="label-text text-xl font-semibold">Model</span>
+                        <span class="label-text font-medium">Model</span>
+                        <span class="label-text-alt text-xs">Must be installed on your Ollama server</span>
                     </label>
-                    <select id="ollamaModel" class="select select-bordered text-lg">
-                        <option value="mistral:7b" {{ 'selected' if settings.ollama_model == 'mistral:7b' }}>Mistral 7B (Balanced)</option>
-                        <option value="llama3:8b" {{ 'selected' if settings.ollama_model == 'llama3:8b' }}>Llama 3 8B (Recommended)</option>
-                        <option value="llama3:70b" {{ 'selected' if settings.ollama_model == 'llama3:70b' }}>Llama 3 70B (Best Quality)</option>
-                        <option value="deepseek-coder" {{ 'selected' if settings.ollama_model == 'deepseek-coder' }}>DeepSeek Coder</option>
+                    <select id="ollamaModel" class="select select-bordered w-full">
+                        <option value="deepseek-r1:7b"   {{ 'selected' if settings.ollama_model == 'deepseek-r1:7b' }}>DeepSeek-R1 7B (Recommended)</option>
+                        <option value="mistral:7b"       {{ 'selected' if settings.ollama_model == 'mistral:7b' }}>Mistral 7B (Balanced)</option>
+                        <option value="llama3:8b"        {{ 'selected' if settings.ollama_model == 'llama3:8b' }}>Llama 3 8B</option>
+                        <option value="llama3:70b"       {{ 'selected' if settings.ollama_model == 'llama3:70b' }}>Llama 3 70B (Best Quality)</option>
                     </select>
-                    <label class="label">
-                        <span class="label-text-alt">Model must be installed on your server: <code>ollama pull llama3:8b</code></span>
-                    </label>
                 </div>
 
-                <!-- Connection Status -->
-                <div id="connectionStatus" class="alert hidden mb-4">
-                    <i data-lucide="info"></i>
-                    <span id="statusMessage">Status message</span>
+                <!-- Connection status -->
+                <div id="connectionStatus" class="alert hidden mb-4 text-sm">
+                    <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+                    <span id="statusMessage">Status</span>
                 </div>
 
-                <!-- Available Models (shown after test) -->
-                <div id="availableModels" class="hidden mb-4">
-                    <h3 class="font-bold text-xl mb-2">Available Models on Server:</h3>
+                <!-- Available models after test -->
+                <div id="availableModels" class="hidden mb-5">
+                    <p class="text-sm font-semibold mb-2">Available models on server:</p>
                     <div id="modelsList" class="flex flex-wrap gap-2"></div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="card-actions justify-end gap-2">
-                    <button onclick="testConnection()" class="btn btn-secondary btn-lg">
-                        <i data-lucide="wifi"></i>
+                <!-- Actions -->
+                <div class="flex gap-3">
+                    <button onclick="testConnection()" class="cp-btn cp-btn-secondary cp-btn-sm gap-1">
+                        <i data-lucide="wifi" class="w-4 h-4"></i>
                         Test Connection
                     </button>
-                    <button onclick="saveSettings()" class="btn btn-primary btn-lg">
-                        <i data-lucide="save"></i>
+                    <button onclick="saveSettings()" class="cp-btn cp-btn-primary cp-btn-sm gap-1">
+                        <i data-lucide="save" class="w-4 h-4"></i>
                         Save Settings
                     </button>
                 </div>
@@ -89,70 +88,61 @@
         </div>
     </div>
 
-    <!-- Help Section -->
-    <div class="alert alert-info">
-        <i data-lucide="info"></i>
-        <div>
-            <h3 class="font-bold text-xl mb-2">Setup Instructions</h3>
-            <ol class="list-decimal ml-6 mt-2 space-y-1">
-                <li>Install Ollama on your server: <code class="bg-base-300 px-2 py-1 rounded">curl -fsSL https://ollama.com/install.sh | sh</code></li>
-                <li>Start Ollama: <code class="bg-base-300 px-2 py-1 rounded">ollama serve</code></li>
-                <li>Pull a model: <code class="bg-base-300 px-2 py-1 rounded">ollama pull llama3:8b</code></li>
-                <li>Enter your server URL above and test connection</li>
-                <li>Enable AI chord generation and save settings</li>
+    <!-- How it works -->
+    <div class="card bg-base-200 shadow mb-6">
+        <div class="card-body">
+            <h3 class="font-bold flex items-center gap-2">
+                <i data-lucide="workflow" class="w-4 h-4 text-primary"></i>
+                Multi-Source Chord Fetching
+            </h3>
+            <ol class="steps steps-vertical mt-3">
+                <li class="step step-primary text-left">
+                    <div class="ml-2 text-sm">
+                        <span class="font-medium">Songsterr API</span>
+                        <span class="text-base-content/50 ml-1">(2–3 sec)</span>
+                    </div>
+                </li>
+                <li class="step step-secondary text-left">
+                    <div class="ml-2 text-sm">
+                        <span class="font-medium">Ultimate Guitar</span>
+                        <span class="text-base-content/50 ml-1">(3–5 sec)</span>
+                    </div>
+                </li>
+                <li class="step step-accent text-left">
+                    <div class="ml-2 text-sm">
+                        <span class="font-medium">Ollama AI</span>
+                        <span class="text-base-content/50 ml-1">(30–60 sec)</span>
+                    </div>
+                </li>
+                <li class="step text-left">
+                    <div class="ml-2 text-sm">
+                        <span class="font-medium">Manual Entry</span>
+                        <span class="text-base-content/50 ml-1">(last resort)</span>
+                    </div>
+                </li>
             </ol>
-            <p class="mt-4">
-                <strong>Performance Note:</strong> AI generation takes 30-60 seconds per song. Best used as fallback when other sources fail.
-            </p>
         </div>
     </div>
 
-    <!-- How It Works -->
-    <div class="card bg-base-300 shadow-xl mt-6">
-        <div class="card-body">
-            <h3 class="text-2xl font-bold mb-4">
-                <i data-lucide="workflow" class="w-6 h-6 inline"></i>
-                How Multi-Source Chord Fetching Works
-            </h3>
-            <div class="space-y-3 text-lg">
-                <div class="flex items-start gap-3">
-                    <div class="badge badge-primary badge-lg">1</div>
-                    <div>
-                        <strong>Songsterr API:</strong> Fast official API (2-3 seconds)
-                    </div>
-                </div>
-                <div class="flex items-start gap-3">
-                    <div class="badge badge-secondary badge-lg">2</div>
-                    <div>
-                        <strong>Ultimate Guitar:</strong> Large database if Songsterr fails (3-5 seconds)
-                    </div>
-                </div>
-                <div class="flex items-start gap-3">
-                    <div class="badge badge-accent badge-lg">3</div>
-                    <div>
-                        <strong>Ollama AI:</strong> Generates chords if both fail (30-60 seconds)
-                    </div>
-                </div>
-                <div class="flex items-start gap-3">
-                    <div class="badge badge-neutral badge-lg">4</div>
-                    <div>
-                        <strong>Manual Entry:</strong> Last resort if all sources fail
-                    </div>
-                </div>
-            </div>
+    <!-- Setup help -->
+    <div class="alert alert-info text-sm">
+        <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+        <div>
+            <p class="font-bold mb-1">Quick Setup</p>
+            <ol class="list-decimal ml-4 space-y-1">
+                <li>Install Ollama: <code class="bg-base-300 px-1 rounded text-xs">curl -fsSL https://ollama.com/install.sh | sh</code></li>
+                <li>Pull a model: <code class="bg-base-300 px-1 rounded text-xs">ollama pull deepseek-r1:7b</code></li>
+                <li>Enter server URL → Test Connection → Save</li>
+            </ol>
         </div>
     </div>
 </div>
 
 <script>
-// Enable/disable settings UI based on checkbox
-document.getElementById('ollamaEnabled').addEventListener('change', function(e) {
-    const settingsDiv = document.getElementById('ollamaSettings');
-    if (e.target.checked) {
-        settingsDiv.classList.remove('opacity-50', 'pointer-events-none');
-    } else {
-        settingsDiv.classList.add('opacity-50', 'pointer-events-none');
-    }
+document.getElementById('ollamaEnabled').addEventListener('change', function() {
+    const s = document.getElementById('ollamaSettings');
+    s.classList.toggle('opacity-40', !this.checked);
+    s.classList.toggle('pointer-events-none', !this.checked);
 });
 
 async function testConnection() {
@@ -160,43 +150,36 @@ async function testConnection() {
     const statusDiv = document.getElementById('connectionStatus');
     const statusMsg = document.getElementById('statusMessage');
     const modelsDiv = document.getElementById('availableModels');
-    const modelsList = document.getElementById('modelsList');
 
-    // Show loading
-    statusDiv.className = 'alert alert-info';
-    statusMsg.textContent = 'Testing connection...';
+    statusDiv.className = 'alert alert-info mb-4 text-sm';
+    statusMsg.textContent = 'Testing connection…';
     statusDiv.classList.remove('hidden');
     modelsDiv.classList.add('hidden');
+    lucide.createIcons();
 
     try {
-        const response = await fetch('/api/settings/test-ollama', {
+        const res = await fetch('/api/settings/test-ollama', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ollama_url: url})
         });
-
-        const result = await response.json();
-
+        const result = await res.json();
         if (result.success) {
-            statusDiv.className = 'alert alert-success';
+            statusDiv.className = 'alert alert-success mb-4 text-sm';
             statusMsg.textContent = '✓ ' + result.message;
-
-            // Show available models
-            if (result.models && result.models.length > 0) {
-                modelsList.innerHTML = result.models.map(m =>
-                    `<div class="badge badge-lg badge-primary">${m}</div>`
-                ).join('');
+            if (result.models?.length) {
+                document.getElementById('modelsList').innerHTML =
+                    result.models.map(m => `<span class="badge badge-sm badge-primary">${m}</span>`).join('');
                 modelsDiv.classList.remove('hidden');
             }
         } else {
-            statusDiv.className = 'alert alert-error';
-            statusMsg.textContent = '✗ Error: ' + result.error;
+            statusDiv.className = 'alert alert-error mb-4 text-sm';
+            statusMsg.textContent = '✗ ' + result.error;
         }
-    } catch (error) {
-        statusDiv.className = 'alert alert-error';
-        statusMsg.textContent = '✗ Connection failed: ' + error.message;
+    } catch(e) {
+        statusDiv.className = 'alert alert-error mb-4 text-sm';
+        statusMsg.textContent = '✗ Connection failed: ' + e.message;
     }
-
     lucide.createIcons();
 }
 
@@ -206,41 +189,26 @@ async function saveSettings() {
         ollama_model: document.getElementById('ollamaModel').value,
         ollama_enabled: document.getElementById('ollamaEnabled').checked
     };
-
     try {
-        const response = await fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+        const res = await fetch('/api/settings', {
+            method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify(settings)
         });
-
-        const result = await response.json();
-
+        const result = await res.json();
+        const statusDiv = document.getElementById('connectionStatus');
+        const statusMsg = document.getElementById('statusMessage');
         if (result.success) {
-            // Show success message
-            const statusDiv = document.getElementById('connectionStatus');
-            const statusMsg = document.getElementById('statusMessage');
-            statusDiv.className = 'alert alert-success';
-            statusMsg.textContent = '✓ Settings saved successfully!';
+            statusDiv.className = 'alert alert-success mb-4 text-sm';
+            statusMsg.textContent = '✓ Settings saved!';
             statusDiv.classList.remove('hidden');
-
-            // Hide after 3 seconds
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-            }, 3000);
+            setTimeout(() => statusDiv.classList.add('hidden'), 3000);
         } else {
-            alert('Error saving settings: ' + (result.error || 'Unknown error'));
+            alert('Error: ' + result.error);
         }
-    } catch (error) {
-        alert('Failed to save settings: ' + error.message);
-    }
-
+    } catch(e) { alert('Failed to save: ' + e.message); }
     lucide.createIcons();
 }
 
-// Initialize icons
-document.addEventListener('DOMContentLoaded', () => {
-    lucide.createIcons();
-});
+document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
 </script>
 {% endblock %}

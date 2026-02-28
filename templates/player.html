@@ -1,98 +1,443 @@
 {% extends "base.html" %}
 
-{% block title %}{{ song.title }} - Guitar Practice App{% endblock %}
+{% block title %}{{ song.title }} — ChordPilot{% endblock %}
+{% block page_title %}{{ song.title }}{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* ── Chord diagram ── */
+.chord-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid oklch(var(--b3));
+    background: oklch(var(--b2));
+    transition: background 0.15s, transform 0.1s;
+    min-width: 68px;
+    user-select: none;
+}
+.chord-diagram:hover {
+    background: oklch(var(--b3));
+    transform: translateY(-2px);
+}
+.chord-diagram .chord-name {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+    color: oklch(var(--p));
+}
+.chord-diagrams-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+}
+</style>
+{% endblock %}
 
 {% block nav_buttons %}
-<a href="/" class="btn btn-ghost btn-lg">
-    <i data-lucide="arrow-left" class="w-6 h-6"></i>
+<a href="/" class="cp-btn cp-btn-ghost cp-btn-sm gap-1">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
     Back
 </a>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto max-w-5xl p-8">
+<div class="max-w-4xl mx-auto">
+
     <!-- Song Info -->
-    <div class="mb-8 text-center">
-        <h1 class="text-5xl font-bold mb-4">{{ parsed.title }}</h1>
-        <p class="text-3xl text-base-content/70 mb-2">{{ parsed.artist }}</p>
+    <div class="mb-6 text-center">
+        <h1 class="text-3xl font-bold mb-1">{{ parsed.title }}</h1>
+        <p class="text-base-content/60 text-lg mb-2">{{ parsed.artist }}</p>
         {% if parsed.key %}
-        <div class="badge badge-secondary badge-lg text-xl">Key of {{ parsed.key }}</div>
+        <span class="badge badge-secondary">Key of {{ parsed.key }}</span>
         {% endif %}
     </div>
 
-    <!-- Audio Player Controls -->
-    <div class="card bg-base-200 shadow-xl mb-8">
-        <div class="card-body">
+    <!-- Audio Player -->
+    <div class="card bg-base-200 shadow-lg mb-6">
+        <div class="card-body py-4 px-5">
             {% if audio_url %}
-            <div class="flex flex-col items-center gap-4">
-                <!-- Audio Element -->
-                <audio id="audio-player" class="w-full" controls preload="auto">
-                    <source src="{{ audio_url }}" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+            <!-- Hidden native audio element -->
+            <audio id="audio-player" preload="auto">
+                <source src="{{ audio_url }}" type="audio/mpeg">
+            </audio>
 
-                <!-- Control Buttons -->
-                <div class="flex gap-4">
-                    <button id="play-btn" class="btn btn-primary btn-lg">
-                        <i data-lucide="play" class="w-8 h-8"></i>
-                        Play
+            <!-- Progress bar -->
+            <div class="flex items-center gap-3 mb-3">
+                <span id="current-time" class="text-sm font-mono w-10 shrink-0">0:00</span>
+                <input type="range" id="seek-bar" class="range range-primary range-xs flex-1"
+                       min="0" max="100" value="0" step="0.1" />
+                <span id="duration" class="text-sm font-mono w-10 shrink-0 text-right">0:00</span>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex gap-2">
+                    <button id="restart-btn" class="cp-btn cp-btn-ghost cp-btn-circle cp-btn-sm" title="Restart">
+                        <i data-lucide="skip-back" class="w-4 h-4"></i>
                     </button>
-                    <button id="pause-btn" class="btn btn-secondary btn-lg" disabled>
-                        <i data-lucide="pause" class="w-8 h-8"></i>
-                        Pause
+                    <button id="play-btn" class="cp-btn cp-btn-primary cp-btn-circle">
+                        <i data-lucide="play" class="w-5 h-5"></i>
                     </button>
-                    <button id="restart-btn" class="btn btn-accent btn-lg">
-                        <i data-lucide="rotate-ccw" class="w-8 h-8"></i>
-                        Restart
+                    <button id="pause-btn" class="cp-btn cp-btn-secondary cp-btn-circle hidden">
+                        <i data-lucide="pause" class="w-5 h-5"></i>
                     </button>
                 </div>
 
-                <!-- Auto-scroll Toggle -->
-                <div class="form-control">
-                    <label class="label cursor-pointer gap-4">
-                        <span class="label-text text-xl">Auto-scroll</span>
-                        <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-lg" checked />
-                    </label>
-                </div>
-
-                <!-- Progress Info -->
-                <div id="progress-info" class="text-lg text-base-content/70">
-                    <span id="current-time">0:00</span> / <span id="duration">0:00</span>
-                </div>
+                <!-- Auto-scroll toggle -->
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <span class="text-sm font-medium">Auto-scroll</span>
+                    <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-sm" checked />
+                </label>
             </div>
             {% else %}
-            <div class="alert alert-warning">
-                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            <div class="alert alert-warning text-sm">
+                <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
                 <div>
-                    <h3 class="font-bold text-xl">Audio not available</h3>
-                    <div class="text-lg">This song doesn't have an audio file yet. You can still view the chords below.</div>
+                    <p class="font-bold">Audio not available</p>
+                    <p>No audio file for this song. You can still view the chords below.</p>
                 </div>
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Chords and Lyrics -->
-    <div id="song-content" class="song-content bg-base-100 rounded-lg p-8 shadow-inner">
+    <!-- Chord Fingering Diagrams -->
+    <div id="chord-diagrams-section" class="mb-6 hidden">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-3">Chord Diagrams</h3>
+        <div id="chord-diagrams-strip" class="chord-diagrams-strip"></div>
+    </div>
+
+    <!-- Chords & Lyrics -->
+    <div id="song-content" class="song-content bg-base-200 rounded-xl p-6 shadow-inner mb-4">
         {{ parsed.html | safe }}
     </div>
 
-    <!-- Spacing at bottom for scrolling -->
+    <!-- Bottom spacing for scroll -->
     <div class="h-screen"></div>
 </div>
+
+<!-- Chord diagram tooltip/modal -->
+<dialog id="chordModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-xs text-center">
+        <h3 id="modalChordName" class="font-bold text-xl mb-4"></h3>
+        <canvas id="modalDiagramCanvas" width="180" height="220" class="mx-auto"></canvas>
+        <div class="modal-action justify-center mt-4">
+            <form method="dialog"><button class="cp-btn cp-btn-ghost cp-btn-sm">Close</button></form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 <script>
-    // Reinitialize icons
-    lucide.createIcons();
+lucide.createIcons();
 
-    // Initialize player when page loads
-    document.addEventListener('DOMContentLoaded', () => {
-        if (typeof initPlayer === 'function') {
-            initPlayer();
+// ═══════════════════════════════════════════════════════════
+// CHORD FINGERING DATA
+// Standard guitar chord positions (frets, strings 6→1 = low E→high E)
+// Format: { frets: [s6,s5,s4,s3,s2,s1], fingers: [...], barre: {fret,from,to} }
+// fret -1 = mute (x), 0 = open
+// ═══════════════════════════════════════════════════════════
+const CHORD_DB = {
+    'C':  { frets: [-1,3,2,0,1,0] },
+    'Cm': { frets: [-1,3,5,5,4,3], barre:{fret:3,from:1,to:5} },
+    'D':  { frets: [-1,-1,0,2,3,2] },
+    'Dm': { frets: [-1,-1,0,2,3,1] },
+    'D7': { frets: [-1,-1,0,2,1,2] },
+    'E':  { frets: [0,2,2,1,0,0] },
+    'Em': { frets: [0,2,2,0,0,0] },
+    'E7': { frets: [0,2,0,1,0,0] },
+    'F':  { frets: [1,1,2,3,3,1], barre:{fret:1,from:0,to:5} },
+    'Fm': { frets: [1,1,3,3,2,1], barre:{fret:1,from:0,to:5} },
+    'G':  { frets: [3,2,0,0,0,3] },
+    'Gm': { frets: [3,5,5,3,3,3], barre:{fret:3,from:0,to:5} },
+    'G7': { frets: [3,2,0,0,0,1] },
+    'A':  { frets: [-1,0,2,2,2,0] },
+    'Am': { frets: [-1,0,2,2,1,0] },
+    'A7': { frets: [-1,0,2,0,2,0] },
+    'B':  { frets: [-1,2,4,4,4,2], barre:{fret:2,from:1,to:5} },
+    'Bm': { frets: [-1,2,4,4,3,2], barre:{fret:2,from:1,to:5} },
+    'B7': { frets: [-1,2,1,2,0,2] },
+    'Cadd9': { frets: [-1,3,2,0,3,0] },
+    'Dsus2':{ frets: [-1,-1,0,2,3,0] },
+    'Dsus4':{ frets: [-1,-1,0,2,3,3] },
+    'Esus4':{ frets: [0,2,2,2,0,0] },
+    'Asus2':{ frets: [-1,0,2,2,0,0] },
+    'Asus4':{ frets: [-1,0,2,2,3,0] },
+    'Fmaj7':{ frets: [-1,-1,3,2,1,0] },
+    'Gmaj7':{ frets: [3,2,0,0,0,2] },
+    'Cmaj7':{ frets: [-1,3,2,0,0,0] },
+    'Amaj7':{ frets: [-1,0,2,1,2,0] },
+    'Dmaj7':{ frets: [-1,-1,0,2,2,2] },
+    'F#m': { frets: [2,4,4,2,2,2], barre:{fret:2,from:0,to:5} },
+    'C#m': { frets: [-1,4,6,6,5,4], barre:{fret:4,from:1,to:5} },
+    'G#m': { frets: [4,6,6,4,4,4], barre:{fret:4,from:0,to:5} },
+    'Bb':  { frets: [-1,1,3,3,3,1], barre:{fret:1,from:1,to:5} },
+    'Bbm': { frets: [-1,1,3,3,2,1], barre:{fret:1,from:1,to:5} },
+    'Eb':  { frets: [-1,-1,1,3,4,3], barre:{fret:1,from:3,to:3} },
+};
+
+// ── Draw chord diagram on a canvas ──────────────────────────
+function drawChordDiagram(canvas, chordName, compact=false) {
+    const chordData = CHORD_DB[chordName] || CHORD_DB[chordName.replace('/', '')] || null;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const w = canvas.width, h = canvas.height;
+    const cols = 6;  // strings
+    const rows = 5;  // frets shown
+
+    const margin = compact ? {top:22,left:14,right:8,bottom:6} : {top:30,left:18,right:12,bottom:10};
+    const gw = w - margin.left - margin.right;
+    const gh = h - margin.top - margin.bottom;
+    const colW = gw / (cols - 1);
+    const rowH = gh / rows;
+
+    // Theme colors
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const fg = isDark ? '#e5e7eb' : '#1f2937';
+    const dotFill = isDark ? '#6366f1' : '#4f46e5';
+    const mutedColor = isDark ? '#ef4444' : '#dc2626';
+    const lineColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+
+    ctx.fillStyle = fg;
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = compact ? 1 : 1.5;
+
+    if (!chordData) {
+        ctx.font = `${compact?9:11}px sans-serif`;
+        ctx.fillStyle = isDark ? '#6b7280' : '#9ca3af';
+        ctx.textAlign = 'center';
+        ctx.fillText('?', w/2, h/2 + 4);
+        return;
+    }
+
+    const { frets, barre } = chordData;
+
+    // Compute min fret (ignoring -1 and 0) to determine offset
+    const activeFrets = frets.filter(f => f > 0);
+    const minFret = activeFrets.length ? Math.min(...activeFrets) : 1;
+    const fretOffset = minFret > 3 ? minFret - 1 : 0;
+
+    // Draw fret position label if offset
+    if (fretOffset > 0) {
+        ctx.fillStyle = fg;
+        ctx.font = `${compact?8:10}px sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${fretOffset+1}fr`, 1, margin.top + rowH * 0.7);
+    }
+
+    // Draw nut (thick top line) only if fretOffset === 0
+    if (fretOffset === 0) {
+        ctx.fillStyle = fg;
+        ctx.fillRect(margin.left - 1, margin.top - 3, gw + 2, compact?3:4);
+    }
+
+    // Draw grid lines (frets)
+    ctx.strokeStyle = lineColor;
+    for (let f = 0; f <= rows; f++) {
+        const y = margin.top + f * rowH;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(margin.left + gw, y);
+        ctx.stroke();
+    }
+
+    // Draw grid lines (strings)
+    for (let s = 0; s < cols; s++) {
+        const x = margin.left + s * colW;
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, margin.top + gh);
+        ctx.stroke();
+    }
+
+    const dotR = compact ? 6 : 8;
+
+    // Draw barre
+    if (barre) {
+        const { fret, from, to } = barre;
+        const y = margin.top + (fret - fretOffset - 0.5) * rowH;
+        const x1 = margin.left + from * colW;
+        const x2 = margin.left + to * colW;
+        ctx.beginPath();
+        ctx.arc(x1, y, dotR, Math.PI/2, 3*Math.PI/2);
+        ctx.arc(x2, y, dotR, -Math.PI/2, Math.PI/2);
+        ctx.fillStyle = dotFill;
+        ctx.fill();
+    }
+
+    // Draw fret dots and mute/open indicators
+    frets.forEach((fret, i) => {
+        const x = margin.left + i * colW;
+        const openY = margin.top - (compact ? 9 : 12);
+
+        if (fret === -1) {
+            // Mute X
+            ctx.strokeStyle = mutedColor;
+            ctx.lineWidth = compact ? 1.5 : 2;
+            const r = compact ? 4 : 5;
+            ctx.beginPath();
+            ctx.moveTo(x-r, openY-r); ctx.lineTo(x+r, openY+r); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x+r, openY-r); ctx.lineTo(x-r, openY+r); ctx.stroke();
+            ctx.strokeStyle = lineColor; ctx.lineWidth = compact ? 1 : 1.5;
+        } else if (fret === 0) {
+            // Open circle
+            ctx.beginPath();
+            ctx.arc(x, openY, compact ? 4 : 5, 0, Math.PI*2);
+            ctx.strokeStyle = fg; ctx.lineWidth = compact ? 1.5 : 2;
+            ctx.stroke();
+            ctx.strokeStyle = lineColor; ctx.lineWidth = compact ? 1 : 1.5;
+        } else {
+            // Finger dot
+            const adjFret = fret - fretOffset;
+            const y = margin.top + (adjFret - 0.5) * rowH;
+            // Skip if barre already covers this
+            if (barre && fret === barre.fret && i >= barre.from && i <= barre.to) return;
+            ctx.beginPath();
+            ctx.arc(x, y, dotR, 0, Math.PI*2);
+            ctx.fillStyle = dotFill;
+            ctx.fill();
         }
     });
+}
+
+// ── Extract unique chords from page's ChordPro HTML ─────────
+function extractChordsFromPage() {
+    const chordEls = document.querySelectorAll('.chord');
+    const seen = new Set();
+    const chords = [];
+    chordEls.forEach(el => {
+        const name = el.textContent.trim().replace(/[[\]]/g, '');
+        if (name && !seen.has(name)) {
+            seen.add(name);
+            chords.push(name);
+        }
+    });
+    return chords;
+}
+
+// ── Render the diagrams strip ────────────────────────────────
+function renderChordDiagrams(chords) {
+    const section = document.getElementById('chord-diagrams-section');
+    const strip = document.getElementById('chord-diagrams-strip');
+    if (!chords.length) return;
+
+    section.classList.remove('hidden');
+    strip.innerHTML = '';
+
+    chords.forEach(name => {
+        const wrap = document.createElement('div');
+        wrap.className = 'chord-diagram';
+        wrap.title = `${name} chord`;
+
+        const label = document.createElement('div');
+        label.className = 'chord-name';
+        label.textContent = name;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 76;
+
+        wrap.appendChild(label);
+        wrap.appendChild(canvas);
+        strip.appendChild(wrap);
+
+        drawChordDiagram(canvas, name, true);
+
+        // Click to show large diagram
+        wrap.addEventListener('click', () => showChordModal(name));
+    });
+}
+
+// ── Large chord modal ────────────────────────────────────────
+function showChordModal(name) {
+    document.getElementById('modalChordName').textContent = name;
+    const c = document.getElementById('modalDiagramCanvas');
+    drawChordDiagram(c, name, false);
+    document.getElementById('chordModal').showModal();
+}
+
+// ── Init on DOMContentLoaded ─────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    lucide.createIcons();
+
+    // Update play/pause button appearance
+    const audio = document.getElementById('audio-player');
+    const playBtn = document.getElementById('play-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const seekBar = document.getElementById('seek-bar');
+
+    if (audio) {
+        audio.addEventListener('play', () => {
+            playBtn?.classList.add('hidden');
+            pauseBtn?.classList.remove('hidden');
+        });
+        audio.addEventListener('pause', () => {
+            playBtn?.classList.remove('hidden');
+            pauseBtn?.classList.add('hidden');
+        });
+        audio.addEventListener('ended', () => {
+            playBtn?.classList.remove('hidden');
+            pauseBtn?.classList.add('hidden');
+        });
+        audio.addEventListener('loadedmetadata', () => {
+            if (seekBar) seekBar.max = audio.duration;
+        });
+        audio.addEventListener('timeupdate', () => {
+            if (seekBar && !seekBar.dragging) {
+                seekBar.value = audio.currentTime;
+            }
+        });
+        if (seekBar) {
+            seekBar.addEventListener('mousedown', () => { seekBar.dragging = true; });
+            seekBar.addEventListener('mouseup', () => {
+                seekBar.dragging = false;
+                audio.currentTime = seekBar.value;
+            });
+            seekBar.addEventListener('input', () => {
+                // Update time display while scrubbing
+                document.getElementById('current-time').textContent = formatTime(parseFloat(seekBar.value));
+            });
+        }
+    }
+
+    // Init existing player.js (handles auto-scroll etc.)
+    if (typeof initPlayer === 'function') initPlayer();
+
+    // Render chord diagrams after a tick (let ChordPro HTML render)
+    setTimeout(() => {
+        const chords = extractChordsFromPage();
+        renderChordDiagrams(chords);
+    }, 50);
+});
+
+// Re-render diagrams on theme change
+document.getElementById('theme-checkbox')?.addEventListener('change', () => {
+    setTimeout(() => {
+        document.querySelectorAll('.chord-diagram canvas').forEach(canvas => {
+            const name = canvas.previousSibling?.textContent?.trim();
+            if (name) drawChordDiagram(canvas, name, true);
+        });
+        const mc = document.getElementById('modalDiagramCanvas');
+        const mn = document.getElementById('modalChordName')?.textContent;
+        if (mc && mn) drawChordDiagram(mc, mn, false);
+    }, 50);
+});
+
+function formatTime(s) {
+    if (isNaN(s) || s < 0) return '0:00';
+    return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
 </script>
 {% endblock %}

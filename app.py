@@ -6,8 +6,11 @@ Multi-source chord fetching: Songsterr → Ultimate Guitar → Ollama AI → Man
 """
 import os
 import json
+import subprocess
 import threading
-from flask import Flask, render_template, jsonify, request, redirect, url_for
+import hashlib
+from functools import wraps
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from utils.chordpro_parser import parse_chordpro
 from utils import database as db
 from utils.youtube_downloader import search_youtube, download_audio, check_ytdlp_installed
@@ -17,6 +20,40 @@ from utils.artist_lookup import get_song_metadata, parse_search_query
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'guitar-practice-app-secret-key'
+
+# Git version: short commit hash (7 chars)
+def _get_git_version():
+    try:
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return 'dev'
+
+GIT_VERSION = _get_git_version()
+
+
+# ─────────────────────────────────────────────
+# AUTH HELPERS
+# ─────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def get_current_user():
+    """Return current user dict from session, or None."""
+    user_id = session.get('user_id')
+    if user_id:
+        return db.get_user_by_id(user_id)
+    return None
 
 # Path to songs directory
 SONGS_DIR = os.path.join(app.static_folder, 'songs')
@@ -73,18 +110,30 @@ def get_song_by_id(song_id):
 
 
 @app.route('/')
-def index():
-    """Home page with song list"""
+@login_required
+def home_page():
+    """Home / practice dashboard — song cards + quick stats"""
     songs = get_all_songs()
-    return render_template('song_list.html', songs=songs)
+    total_plays = sum((s.get('play_count') or 0) for s in songs)
+    practiced_count = sum(1 for s in songs if (s.get('play_count') or 0) > 0)
+    return render_template('home.html', songs=songs,
+                           total_plays=total_plays, practiced_count=practiced_count)
 
 
 @app.route('/library')
-def library():
-    """Library management page"""
+@login_required
+def library_page():
+    """Library — full song database with table view"""
     songs = get_all_songs()
-    ytdlp_installed = check_ytdlp_installed()
-    return render_template('library.html', songs=songs, ytdlp_installed=ytdlp_installed)
+    enriched = []
+    for s in songs:
+        s = dict(s)
+        folder = s.get('folder', '')
+        s['has_audio'] = os.path.exists(os.path.join(SONGS_DIR, folder, 'audio.mp3'))
+        s['has_chords'] = os.path.exists(os.path.join(SONGS_DIR, folder, 'chords.cho'))
+        enriched.append(s)
+    return render_template('library.html', songs=enriched,
+                           total_rows=len(enriched), ytdlp_installed=check_ytdlp_installed())
 
 
 @app.route('/library/search')
@@ -474,6 +523,7 @@ def api_search_chords():
 
 
 @app.route('/settings')
+@login_required
 def settings_page():
     """Settings page for configuring AI server"""
     settings = load_settings()
@@ -561,6 +611,127 @@ def check_ollama_status():
         'available': available,
         'message': message
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AUTH ROUTES
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/login', methods=['GET', 'POST'])
+def login_page():
+    """Login page"""
+    if session.get('user_id'):
+        return redirect(url_for('home_page'))
+
+    error = None
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        user = db.verify_password(email, password)
+        if user:
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['avatar_url'] = user.get('avatar_url') or ''
+            return redirect(url_for('home_page'))
+        else:
+            error = 'Invalid email or password.'
+
+    return render_template('login.html', error=error)
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register_page():
+    """Registration page"""
+    if session.get('user_id'):
+        return redirect(url_for('home_page'))
+
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm_password', '')
+
+        if not username or not email or not password:
+            error = 'All fields are required.'
+        elif password != confirm:
+            error = 'Passwords do not match.'
+        elif len(password) < 6:
+            error = 'Password must be at least 6 characters.'
+        else:
+            user_id = db.create_user(username, email, password)
+            if user_id is None:
+                error = 'Email or username already in use.'
+            else:
+                session['user_id'] = user_id
+                session['username'] = username
+                session['avatar_url'] = ''
+                db.add_notification(user_id, f'Welcome to ChordPilot, {username}!')
+                return redirect(url_for('home_page'))
+
+    return render_template('login.html', error=error, register=True)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TUNER ROUTE
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/tuner')
+@login_required
+def tuner_page():
+    """Guitar tuner page"""
+    return render_template('tuner.html')
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTIFICATIONS API
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/notifications')
+def api_notifications():
+    """Return unread count and notification list for current user."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'unread': 0, 'notifications': []})
+
+    notifications = db.get_notifications(user_id)
+    unread = db.get_unread_count(user_id)
+    return jsonify({'unread': unread, 'notifications': notifications})
+
+
+@app.route('/api/notifications/read', methods=['POST'])
+def api_mark_notifications_read():
+    user_id = session.get('user_id')
+    if user_id:
+        db.mark_notifications_read(user_id)
+    return jsonify({'success': True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONTEXT PROCESSOR — inject current_user into all templates
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.context_processor
+def inject_user():
+    user_id = session.get('user_id')
+    current_user = None
+    unread_count = 0
+    gravatar_url = ''
+    if user_id:
+        current_user = db.get_user_by_id(user_id)
+        unread_count = db.get_unread_count(user_id)
+        if current_user:
+            email = (current_user.get('email') or '').lower().strip()
+            email_hash = hashlib.md5(email.encode()).hexdigest()
+            gravatar_url = f"https://www.gravatar.com/avatar/{email_hash}?s=80&d=identicon"
+    return dict(current_user=current_user, unread_count=unread_count,
+                git_version=GIT_VERSION, gravatar_url=gravatar_url)
 
 
 if __name__ == '__main__':

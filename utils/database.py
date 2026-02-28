@@ -5,6 +5,8 @@ Uses SQLite3 for storing song metadata
 import sqlite3
 import json
 import os
+import hashlib
+import secrets
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -52,6 +54,30 @@ def init_db():
             started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             completed_at TIMESTAMP,
             FOREIGN KEY (song_id) REFERENCES songs(song_id)
+        )
+    ''')
+
+    # Users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            avatar_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Notifications table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
 
@@ -254,6 +280,117 @@ def get_download_status(song_id: str) -> Optional[Dict]:
     conn.close()
 
     return dict(row) if row else None
+
+
+# ─────────────────────────────────────────────
+# USER AUTH
+# ─────────────────────────────────────────────
+
+def _hash_password(password: str, salt: str = None) -> tuple:
+    """Hash a password with a salt. Returns (hash, salt)."""
+    if salt is None:
+        salt = secrets.token_hex(16)
+    pw_hash = hashlib.sha256((salt + password).encode()).hexdigest()
+    return pw_hash, salt
+
+
+def create_user(username: str, email: str, password: str, avatar_url: str = None) -> Optional[int]:
+    """Create a new user. Returns user id or None on error."""
+    pw_hash, salt = _hash_password(password)
+    stored = f"{salt}:{pw_hash}"
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO users (username, email, password_hash, avatar_url)
+            VALUES (?, ?, ?, ?)
+        ''', (username, email, stored, avatar_url))
+        user_id = cursor.lastrowid
+        conn.commit()
+        return user_id
+    except sqlite3.IntegrityError:
+        return None
+    finally:
+        conn.close()
+
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    """Get a user by email address."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict]:
+    """Get a user by id."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def verify_password(email: str, password: str) -> Optional[Dict]:
+    """Verify credentials. Returns user dict on success, None on failure."""
+    user = get_user_by_email(email)
+    if not user:
+        return None
+    stored = user['password_hash']
+    if ':' not in stored:
+        return None
+    salt, pw_hash = stored.split(':', 1)
+    computed, _ = _hash_password(password, salt)
+    if computed == pw_hash:
+        return user
+    return None
+
+
+# ─────────────────────────────────────────────
+# NOTIFICATIONS
+# ─────────────────────────────────────────────
+
+def get_notifications(user_id: int) -> List[Dict]:
+    """Get all notifications for a user, newest first."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 20
+    ''', (user_id,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_unread_count(user_id: int) -> int:
+    """Return count of unread notifications for a user."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read = 0', (user_id,))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+
+def mark_notifications_read(user_id: int):
+    """Mark all notifications as read for a user."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE notifications SET read = 1 WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def add_notification(user_id: int, message: str):
+    """Add a notification for a user."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO notifications (user_id, message) VALUES (?, ?)', (user_id, message))
+    conn.commit()
+    conn.close()
 
 
 if __name__ == '__main__':

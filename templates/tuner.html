@@ -1,0 +1,628 @@
+{% extends "base.html" %}
+
+{% block title %}Guitar Tuner — ChordPilot{% endblock %}
+{% block page_title %}Guitar Tuner{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* ─── String button circles ─── */
+.str-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 2px solid oklch(var(--b3));
+    background: oklch(var(--b2));
+    color: oklch(var(--bc)/0.7);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0; cursor: pointer; user-select: none;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.str-btn:hover { border-color: oklch(var(--p)/0.5); }
+.str-btn.detected {
+    border-color: oklch(var(--p));
+    background: oklch(var(--p)/0.12);
+    color: oklch(var(--p));
+    transform: scale(1.1);
+    box-shadow: 0 0 0 3px oklch(var(--p)/0.2);
+}
+.str-btn.in-tune {
+    border-color: oklch(var(--su));
+    background: oklch(var(--su)/0.12);
+    color: oklch(var(--su));
+    transform: scale(1.1);
+    box-shadow: 0 0 0 3px oklch(var(--su)/0.25);
+}
+.str-btn.celebrating {
+    background: oklch(var(--su));
+    color: white;
+    border-color: oklch(var(--su));
+    animation: celebrate-pop 0.4s ease-out 2;
+}
+@keyframes celebrate-pop {
+    0%, 100% { transform: scale(1.1); }
+    50% { transform: scale(1.3); box-shadow: 0 0 0 14px oklch(var(--su)/0); }
+}
+
+/* ─── Tuning needle bar ─── */
+.needle-track {
+    position: relative;
+    height: 12px;
+    border-radius: 99px;
+    background: oklch(var(--b3));
+    /* soft green glow in center */
+    background-image: linear-gradient(to right,
+        transparent 38%, oklch(var(--su)/0.18) 45%,
+        oklch(var(--su)/0.35) 50%,
+        oklch(var(--su)/0.18) 55%, transparent 62%);
+}
+.needle-track::after {
+    content: '';
+    position: absolute;
+    left: 50%; top: -3px; bottom: -3px;
+    width: 2px;
+    background: oklch(var(--su)/0.55);
+    transform: translateX(-50%);
+    border-radius: 1px;
+}
+.needle-dot {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: oklch(var(--bc)/0.25);
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    transition: left .09s ease-out, background .15s, box-shadow .15s;
+}
+.needle-dot.active  { background: oklch(var(--er)); box-shadow: 0 2px 6px oklch(var(--er)/.4); }
+.needle-dot.close   { background: oklch(var(--wa)); box-shadow: 0 2px 6px oklch(var(--wa)/.4); }
+.needle-dot.in-tune { background: oklch(var(--su)); box-shadow: 0 0 0 5px oklch(var(--su)/.22), 0 2px 6px oklch(var(--su)/.5); }
+
+/* ─── Big note ─── */
+.note-big {
+    font-size: 6.5rem; font-weight: 900;
+    line-height: 1; letter-spacing: -0.04em;
+    transition: color .15s;
+    display: inline-block; min-width: 1.05ch; text-align: center;
+}
+.note-big.idle    { color: oklch(var(--bc)/.15); }
+.note-big.flat    { color: oklch(var(--er)); }
+.note-big.sharp   { color: oklch(var(--wa)); }
+.note-big.in-tune { color: oklch(var(--su)); }
+
+/* ─── Hold progress ─── */
+.hold-track { height: 4px; border-radius: 2px; background: oklch(var(--b3)); overflow: hidden; }
+.hold-fill  { height: 100%; background: oklch(var(--su)); border-radius: 2px; width: 0%; transition: width .1s linear; }
+
+/* ─── Mic level bar ─── */
+.mic-track { height: 4px; border-radius: 2px; background: oklch(var(--b3)); overflow: hidden; }
+.mic-fill  { height: 100%; border-radius: 2px; width: 0%; transition: width .06s linear;
+             background: linear-gradient(to right, oklch(var(--su)), oklch(var(--wa)) 70%, oklch(var(--er))); }
+
+/* ─── Card flash ─── */
+@keyframes card-success {
+    0%   { box-shadow: 0 20px 25px -5px oklch(0 0 0/.1); }
+    40%  { box-shadow: 0 0 0 5px oklch(var(--su)/.45), 0 20px 25px -5px oklch(0 0 0/.1); }
+    100% { box-shadow: 0 0 0 0 oklch(var(--su)/0), 0 20px 25px -5px oklch(0 0 0/.1); }
+}
+.card-flash { animation: card-success .7s ease-out; }
+
+/* ─── Pulse when listening ─── */
+@keyframes listen-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.listening-pulse { animation: listen-pulse 1.5s ease-in-out infinite; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-sm mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-start justify-between mb-5">
+        <div>
+            <h1 class="text-2xl font-bold">Guitar Tuner</h1>
+            <p class="text-sm text-base-content/50 mt-0.5">Standard tuning · E A D G B E</p>
+        </div>
+        <div class="flex gap-2 mt-0.5">
+            <button id="start-btn" onclick="startTuner()" class="cp-btn cp-btn-primary gap-1.5">
+                <i data-lucide="mic" class="w-4 h-4"></i> Start
+            </button>
+            <button id="stop-btn" onclick="stopTuner()" class="cp-btn cp-btn-danger gap-1.5 hidden">
+                <i id="stop-icon" data-lucide="mic-off" class="w-4 h-4"></i> Stop
+            </button>
+        </div>
+    </div>
+
+    <!-- Main card -->
+    <div class="card bg-base-200 shadow-xl" id="main-card">
+        <div class="card-body gap-4 pt-5 pb-5 px-5">
+
+            <!-- Mic level (proves mic is working) -->
+            <div class="flex items-center gap-2">
+                <i data-lucide="mic" class="w-3.5 h-3.5 text-base-content/30 shrink-0"></i>
+                <div class="mic-track flex-1">
+                    <div id="mic-fill" class="mic-fill"></div>
+                </div>
+                <span id="mic-db" class="text-[10px] font-mono text-base-content/30 w-8 text-right">—</span>
+            </div>
+
+            <!-- Sensitivity boost — critical for quiet acoustic guitar mics -->
+            <div class="flex items-center gap-2">
+                <i data-lucide="signal" class="w-3.5 h-3.5 text-base-content/30 shrink-0"></i>
+                <input type="range" id="sensitivity-slider"
+                       min="1" max="24" value="8" step="1"
+                       class="range range-xs flex-1"
+                       oninput="updateSensitivity(this.value)" />
+                <span id="sens-label" class="text-[10px] font-mono text-base-content/30 w-8 text-right">8×</span>
+            </div>
+
+            <!-- String buttons -->
+            <div class="flex justify-between gap-1" id="string-buttons"></div>
+
+            <!-- Note + octave + Hz -->
+            <div class="text-center py-1">
+                <div class="flex items-end justify-center gap-1">
+                    <span id="note-display" class="note-big idle">—</span>
+                    <span id="octave-display"
+                          class="text-[2rem] font-bold text-base-content/30 mb-2 transition-colors duration-150"></span>
+                </div>
+                <div id="freq-display" class="text-base-content/40 text-sm font-mono mt-0.5">— Hz</div>
+            </div>
+
+            <!-- Needle bar -->
+            <div class="px-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-bold text-base-content/30">♭</span>
+                    <div class="needle-track flex-1 relative">
+                        <div id="needle-dot" class="needle-dot"></div>
+                    </div>
+                    <span class="text-sm font-bold text-base-content/30">♯</span>
+                </div>
+                <div id="cents-display" class="text-center text-xs font-mono text-base-content/40 mt-1.5">—</div>
+            </div>
+
+            <!-- Status + hold -->
+            <div>
+                <div id="status-text"
+                     class="text-center text-sm font-semibold mb-2 text-base-content/40"
+                     style="min-height:1.4rem">Press Start to tune</div>
+                <div class="hold-track">
+                    <div id="hold-fill" class="hold-fill"></div>
+                </div>
+                <div id="hold-hint"
+                     class="text-center text-xs text-base-content/30 mt-1"
+                     style="min-height:1rem"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Mic error -->
+    <div id="mic-error" class="alert alert-error hidden mt-4 text-sm">
+        <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+        <div>
+            <p class="font-bold">Microphone access denied</p>
+            <p>Please allow microphone access in your browser settings.</p>
+        </div>
+    </div>
+
+    <p class="text-xs text-base-content/25 text-center mt-4">
+        Tap a string circle to hear reference · Hold in tune ~1.5 s for confirmation
+    </p>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// CHORDPILOT GUITAR TUNER
+// Algorithm: constrained autocorrelation (proven approach)
+//            restricted to guitar frequency range 70–380 Hz
+// ════════════════════════════════════════════════════════
+
+const GUITAR_STRINGS = [
+    { name:'E2', freq:82.41,  note:'E', octave:2, label:'6' },
+    { name:'A2', freq:110.00, note:'A', octave:2, label:'5' },
+    { name:'D3', freq:146.83, note:'D', octave:3, label:'4' },
+    { name:'G3', freq:196.00, note:'G', octave:3, label:'3' },
+    { name:'B3', freq:246.94, note:'B', octave:3, label:'2' },
+    { name:'E4', freq:329.63, note:'E', octave:4, label:'1' },
+];
+
+// ── State ──────────────────────────────────────────────────
+let audioCtx    = null;
+let analyser    = null;
+let gainNode    = null;   // digital boost for quiet mics
+let micStream   = null;
+let rafId       = null;
+let oscNode     = null;
+let isRunning   = false;
+let smoothFreq  = 0;
+let inTuneStart = null;
+let celebLocked = false;
+
+let sensitivity = 8;      // default 8× gain boost
+
+const IN_TUNE_CENTS  = 5;     // ±5 cents = in tune
+const IN_TUNE_MS     = 900;   // hold this long → celebrate (was 1500, acoustic decays faster)
+
+// ── Build string circles ────────────────────────────────────
+function buildStringButtons() {
+    document.getElementById('string-buttons').innerHTML =
+        GUITAR_STRINGS.map((s, i) => `
+            <button class="str-btn" id="str-${i}"
+                    onclick="playReference(${s.freq})"
+                    title="${s.name}">
+                <span style="font-size:9px;opacity:.45;line-height:1.1">${s.label}</span>
+                <span style="font-size:15px;font-weight:800;line-height:1.15">${s.note}</span>
+                <span style="font-size:8px;opacity:.35;line-height:1.1">${s.name}</span>
+            </button>`).join('');
+}
+
+// ── Reference tone ──────────────────────────────────────────
+function playReference(freq) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (oscNode) { try { oscNode.stop(); } catch(_){} oscNode = null; }
+    const gain = audioCtx.createGain();
+    oscNode = audioCtx.createOscillator();
+    oscNode.type = 'triangle';
+    oscNode.frequency.value = freq;
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.8);
+    oscNode.connect(gain);
+    gain.connect(audioCtx.destination);
+    oscNode.start();
+    oscNode.stop(audioCtx.currentTime + 1.8);
+}
+
+// ── Start ───────────────────────────────────────────────────
+async function startTuner() {
+    try {
+        // IMPORTANT: disable browser audio processing for accurate pitch
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            },
+            video: false
+        });
+    } catch(e) {
+        console.error('Mic error:', e);
+        document.getElementById('mic-error').classList.remove('hidden');
+        return;
+    }
+
+    document.getElementById('mic-error').classList.add('hidden');
+    document.getElementById('start-btn').classList.add('hidden');
+    document.getElementById('stop-btn').classList.remove('hidden');
+    document.getElementById('stop-icon').classList.add('listening-pulse');
+
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Always resume — some browsers start suspended
+    try { await audioCtx.resume(); } catch(_){}
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;             // 2048 = fast + enough resolution
+    analyser.smoothingTimeConstant = 0;  // No smoothing on time-domain (it's ignored anyway)
+
+    const src = audioCtx.createMediaStreamSource(micStream);
+    // Boost quiet microphones (acoustic guitars especially)
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = sensitivity;
+    src.connect(gainNode);
+    gainNode.connect(analyser);
+
+    isRunning  = true;
+    smoothFreq = 0;
+    setStatus('Pluck a string…', '');
+    detect();
+}
+
+// ── Stop ────────────────────────────────────────────────────
+function stopTuner() {
+    isRunning = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    analyser = null;
+    gainNode = null;
+    document.getElementById('start-btn').classList.remove('hidden');
+    document.getElementById('stop-btn').classList.add('hidden');
+    document.getElementById('stop-icon').classList.remove('listening-pulse');
+    document.getElementById('mic-fill').style.width = '0%';
+    document.getElementById('mic-db').textContent = '—';
+    resetDisplay();
+    setStatus('Press Start to tune', '');
+}
+
+// ── Detection loop ──────────────────────────────────────────
+function detect() {
+    if (!isRunning || !analyser) return;
+    rafId = requestAnimationFrame(detect);
+
+    const buf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+
+    const rms = getRMS(buf);
+    updateMicMeter(rms);
+
+    const raw = detectPitch(buf, rms, audioCtx.sampleRate);
+
+    if (raw > 0) {
+        // Smooth: reset on large jumps (>2 semitones), blend otherwise
+        if (smoothFreq <= 0) {
+            smoothFreq = raw;
+        } else {
+            const jump = Math.abs(1200 * Math.log2(raw / smoothFreq));
+            smoothFreq = jump > 150 ? raw : smoothFreq * 0.65 + raw * 0.35;
+        }
+        updateDisplay(smoothFreq);
+    } else {
+        // Decay display slowly so it doesn't flicker
+        if (smoothFreq > 0) {
+            smoothFreq *= 0.88;
+            if (smoothFreq < 68) {
+                smoothFreq = 0;
+                resetDisplay();
+                setStatus('Pluck a string…', '');
+            } else {
+                updateDisplay(smoothFreq);
+            }
+        }
+        if (smoothFreq <= 0 && !celebLocked) {
+            inTuneStart = null;
+            document.getElementById('hold-fill').style.width = '0%';
+            document.getElementById('hold-hint').textContent = '';
+        }
+    }
+}
+
+// ── Pitch detector ──────────────────────────────────────────
+// Classic autocorrelation, constrained to guitar range (70–380 Hz).
+// No exotic math — just finds the lag with the highest correlation.
+function detectPitch(buf, rms, sampleRate) {
+    // Silence gate — kept low so quiet acoustic guitars still register
+    if (rms < 0.003) return -1;
+
+    const N   = buf.length;
+
+    // Zero-crossing trim: improves accuracy by removing edge transients
+    let r1 = 0, r2 = N - 1;
+    for (let i = 0; i < N / 2; i++) { if (buf[i]   < 0) { r1 = i; break; } }
+    for (let i = 1; i < N / 2; i++) { if (buf[N-i] < 0) { r2 = N - i; break; } }
+    const len = r2 - r1;
+    if (len < 80) return -1;
+
+    // Guitar range constraints:
+    //   Lowest string  E2  = 82.41 Hz  → period ≈ 535 samples (at 44100)
+    //   Highest string E4  = 329.63 Hz → period ≈ 134 samples
+    // We search lags from 110 samples (≈400 Hz) to 650 samples (≈68 Hz)
+    const tauMin = Math.max(2,   Math.floor(sampleRate / 390));  // ~113
+    const tauMax = Math.min(len, Math.floor(sampleRate / 68));   // ~648
+
+    // Autocorrelation: find lag with highest positive correlation
+    let bestC = -Infinity, bestTau = -1;
+    for (let tau = tauMin; tau <= tauMax; tau++) {
+        let c = 0;
+        for (let j = r1; j < r2 - tau; j++) c += buf[j] * buf[j + tau];
+        if (c > bestC) { bestC = c; bestTau = tau; }
+    }
+
+    // Reject if correlation is weak relative to signal energy
+    // c0 ≈ rms² * N (energy of the signal)
+    if (bestTau < 0) return -1;
+    const c0 = rms * rms * N;
+    if (bestC < c0 * 0.25) return -1;  // correlation ratio threshold
+
+    // Parabolic interpolation for sub-sample accuracy (±3 cents → ±0.5 cents)
+    if (bestTau > tauMin && bestTau < tauMax) {
+        let cPrev = 0, cNext = 0;
+        for (let j = r1; j < r2 - (bestTau-1); j++) cPrev += buf[j] * buf[j + bestTau - 1];
+        for (let j = r1; j < r2 - (bestTau+1); j++) cNext += buf[j] * buf[j + bestTau + 1];
+        const denom = 2 * (2 * bestC - cPrev - cNext);
+        if (Math.abs(denom) > 1e-6) bestTau += (cPrev - cNext) / denom;
+    }
+
+    return sampleRate / bestTau;
+}
+
+// ── RMS helper ──────────────────────────────────────────────
+function getRMS(buf) {
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    return Math.sqrt(sum / buf.length);
+}
+
+// ── Mic level meter ─────────────────────────────────────────
+function updateMicMeter(rms) {
+    // rms here is AFTER the gain boost, so it reflects amplified signal
+    const pct = Math.min(100, rms * 333);
+    document.getElementById('mic-fill').style.width = pct + '%';
+
+    const hintEl = document.getElementById('hold-hint');
+    if (rms > 0.001) {
+        const db = Math.max(-40, 20 * Math.log10(rms));
+        document.getElementById('mic-db').textContent = Math.round(db) + 'dB';
+        // Show hint if still too quiet after boost
+        if (rms < 0.015 && isRunning && !celebLocked) {
+            hintEl.textContent = 'Signal low — slide sensitivity ↑ or play louder';
+        }
+    } else {
+        document.getElementById('mic-db').textContent = '—';
+    }
+}
+
+// ── Find nearest guitar string ───────────────────────────────
+function nearestString(freq) {
+    let best = null, bestCents = Infinity;
+    GUITAR_STRINGS.forEach((s, i) => {
+        const c = 1200 * Math.log2(freq / s.freq);
+        if (Math.abs(c) < Math.abs(bestCents)) { bestCents = c; best = { ...s, index: i }; }
+    });
+    // Match if within ±100 cents (1 semitone) — handles badly detuned guitars
+    return Math.abs(bestCents) <= 100 ? { str: best, cents: bestCents } : null;
+}
+
+// ── Update display ───────────────────────────────────────────
+function updateDisplay(freq) {
+    const match = nearestString(freq);
+    if (!match) { setStatus('Pluck a string…', ''); return; }
+
+    const { str, cents } = match;
+    const absC  = Math.abs(cents);
+    const inTune = absC < IN_TUNE_CENTS;
+
+    // Note + octave
+    const noteEl   = document.getElementById('note-display');
+    const octaveEl = document.getElementById('octave-display');
+    noteEl.textContent   = str.note;
+    octaveEl.textContent = str.octave;
+
+    // Hz
+    document.getElementById('freq-display').textContent = freq.toFixed(1) + ' Hz';
+
+    // Cents
+    document.getElementById('cents-display').textContent =
+        absC < 0.5 ? '0 cents' : (cents > 0 ? '+' : '') + Math.round(cents) + ' cents';
+
+    // Needle position: 50% = in tune; spans 6%–94%
+    const pct = 50 + Math.max(-44, Math.min(44, (cents / 50) * 44));
+    const dot  = document.getElementById('needle-dot');
+    dot.style.left = pct + '%';
+
+    // Colors
+    if (inTune) {
+        dot.className  = 'needle-dot in-tune';
+        noteEl.className  = 'note-big in-tune';
+        octaveEl.style.color = 'oklch(var(--su))';
+        setStatus('✓  In Tune!', 'su');
+    } else if (absC < 20) {
+        dot.className  = 'needle-dot close';
+        noteEl.className  = cents < 0 ? 'note-big flat' : 'note-big sharp';
+        octaveEl.style.color = '';
+        const amt = Math.abs(Math.round(cents));
+        setStatus(cents < 0 ? `${amt} cents flat — tune up ↑` : `${amt} cents sharp — tune down ↓`,
+                  cents < 0 ? 'wa' : 'wa');
+    } else {
+        dot.className  = 'needle-dot active';
+        noteEl.className  = cents < 0 ? 'note-big flat' : 'note-big sharp';
+        octaveEl.style.color = '';
+        const amt = Math.abs(Math.round(cents));
+        setStatus(cents < 0 ? `${amt} cents flat — tune up ↑` : `${amt} cents sharp — tune down ↓`,
+                  cents < 0 ? 'er' : 'er');
+    }
+
+    // String button highlights
+    document.querySelectorAll('.str-btn').forEach((btn, i) => {
+        if (btn.classList.contains('celebrating')) return;
+        btn.classList.toggle('in-tune',  i === str.index && inTune);
+        btn.classList.toggle('detected', i === str.index && !inTune);
+        if (i !== str.index) btn.classList.remove('in-tune', 'detected');
+    });
+
+    // Hold-in-tune progress
+    if (inTune && !celebLocked) {
+        if (!inTuneStart) inTuneStart = Date.now();
+        const elapsed = Date.now() - inTuneStart;
+        const pct2 = Math.min(100, (elapsed / IN_TUNE_MS) * 100);
+        document.getElementById('hold-fill').style.width = pct2 + '%';
+        document.getElementById('hold-hint').textContent = pct2 < 100 ? 'Hold steady…' : '';
+        if (elapsed >= IN_TUNE_MS) celebrate(str);
+    } else if (!inTune && !celebLocked) {
+        inTuneStart = null;
+        document.getElementById('hold-fill').style.width = '0%';
+        document.getElementById('hold-hint').textContent = '';
+    }
+}
+
+// ── Celebration ──────────────────────────────────────────────
+function celebrate(str) {
+    celebLocked = true;
+    inTuneStart = null;
+    playChime();
+
+    document.getElementById('hold-fill').style.width = '100%';
+    document.getElementById('hold-hint').textContent = '';
+    setStatus('🎸  Perfect! String tuned!', 'su');
+
+    const card = document.getElementById('main-card');
+    card.classList.add('card-flash');
+    setTimeout(() => card.classList.remove('card-flash'), 800);
+
+    const btn = document.getElementById(`str-${str.index}`);
+    if (btn) {
+        btn.classList.remove('in-tune', 'detected');
+        btn.classList.add('celebrating');
+        setTimeout(() => btn.classList.remove('celebrating', 'in-tune'), 1600);
+    }
+
+    setTimeout(() => {
+        celebLocked = false;
+        inTuneStart = null;
+        document.getElementById('hold-fill').style.width = '0%';
+        setStatus('Pluck next string…', '');
+    }, 2800);
+}
+
+// ── Success chime (G-major arpeggio) ─────────────────────────
+function playChime() {
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    [392.00, 493.88, 587.33, 783.99].forEach((f, i) => {
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const t    = audioCtx.currentTime + i * 0.11;
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.18, t + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 1.1);
+    });
+}
+
+// ── Helpers ──────────────────────────────────────────────────
+function setStatus(text, colorKey) {
+    const el = document.getElementById('status-text');
+    el.textContent = text;
+    el.className = 'text-center text-sm font-semibold mb-2 ';
+    if      (colorKey === 'su') el.className += 'text-success';
+    else if (colorKey === 'er') el.className += 'text-error';
+    else if (colorKey === 'wa') el.className += 'text-warning';
+    else                        el.className += 'text-base-content/40';
+}
+
+function resetDisplay() {
+    document.getElementById('note-display').textContent  = '—';
+    document.getElementById('note-display').className    = 'note-big idle';
+    document.getElementById('octave-display').textContent = '';
+    document.getElementById('octave-display').style.color = '';
+    document.getElementById('freq-display').textContent  = '— Hz';
+    document.getElementById('cents-display').textContent = '—';
+    document.getElementById('hold-fill').style.width = '0%';
+    document.getElementById('hold-hint').textContent = '';
+    const dot = document.getElementById('needle-dot');
+    dot.style.left = '50%';
+    dot.className  = 'needle-dot';
+    document.querySelectorAll('.str-btn').forEach(b =>
+        b.classList.remove('detected', 'in-tune', 'celebrating'));
+    inTuneStart = null;
+}
+
+// ── Sensitivity slider ────────────────────────────────────────
+function updateSensitivity(val) {
+    sensitivity = parseInt(val);
+    document.getElementById('sens-label').textContent = val + '×';
+    if (gainNode) gainNode.gain.value = sensitivity;
+}
+
+// ── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    buildStringButtons();
+    lucide.createIcons();
+});
+</script>
+{% endblock %}

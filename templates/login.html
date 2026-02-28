@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if register %}Register{% else %}Login{% endif %} — ChordPilot</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background: oklch(var(--b1)); }
+        .cp-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 6px; border-radius: 4px; font-weight: 500; font-size: 0.875rem;
+            line-height: 1; white-space: nowrap; cursor: pointer;
+            border: 1px solid transparent; height: 36px; padding: 0 16px;
+            text-decoration: none; transition: filter 0.12s, background 0.12s;
+            flex-shrink: 0;
+        }
+        .cp-btn:hover:not(:disabled) { filter: brightness(0.92); }
+        .cp-btn-primary { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Theme init (matches base.html) -->
+    <script>
+    (function(){
+        const theme = localStorage.getItem('cp-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+    })();
+    </script>
+
+    <div class="card bg-base-200 shadow-2xl w-full max-w-sm">
+        <div class="card-body p-8">
+
+            <!-- Logo -->
+            <div class="flex justify-center mb-6">
+                <div>
+                    <img src="/static/images/chordpilot-logo-white.png" alt="ChordPilot"
+                         class="h-10 mx-auto block [data-theme=light]:hidden" id="logo-dark" />
+                    <img src="/static/images/chordpilot-logo-black.png" alt="ChordPilot"
+                         class="h-10 mx-auto hidden" id="logo-light" />
+                </div>
+            </div>
+
+            <h2 class="text-xl font-bold text-center mb-5">
+                {% if register %}Create Account{% else %}Welcome Back{% endif %}
+            </h2>
+
+            <!-- Error alert -->
+            {% if error %}
+            <div class="alert alert-error mb-4 text-sm">
+                <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <!-- Form -->
+            <form method="POST" action="{{ '/register' if register else '/login' }}">
+
+                {% if register %}
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm font-medium">Username</span></label>
+                    <input type="text" name="username" required
+                           placeholder="Your username"
+                           class="input input-bordered input-sm" />
+                </div>
+                {% endif %}
+
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm font-medium">Email</span></label>
+                    <input type="email" name="email" required
+                           placeholder="you@example.com"
+                           class="input input-bordered input-sm" />
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm font-medium">Password</span></label>
+                    <input type="password" name="password" required
+                           placeholder="••••••••"
+                           class="input input-bordered input-sm" />
+                </div>
+
+                {% if register %}
+                <div class="form-control mb-4">
+                    <label class="label py-1"><span class="label-text text-sm font-medium">Confirm Password</span></label>
+                    <input type="password" name="confirm_password" required
+                           placeholder="••••••••"
+                           class="input input-bordered input-sm" />
+                </div>
+                {% else %}
+                <div class="form-control mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="remember" class="checkbox checkbox-sm checkbox-primary" />
+                        <span class="text-sm">Remember me</span>
+                    </label>
+                </div>
+                {% endif %}
+
+                <button type="submit" class="cp-btn cp-btn-primary w-full gap-1">
+                    <i data-lucide="{{ 'user-plus' if register else 'log-in' }}" class="w-4 h-4"></i>
+                    {% if register %}Create Account{% else %}Sign In{% endif %}
+                </button>
+            </form>
+
+            <div class="divider text-xs mt-4 mb-2">or</div>
+
+            {% if register %}
+            <p class="text-center text-sm text-base-content/60">
+                Already have an account?
+                <a href="/login" class="link link-primary">Sign in</a>
+            </p>
+            {% else %}
+            <p class="text-center text-sm text-base-content/60">
+                Don't have an account?
+                <a href="/register" class="link link-primary">Register</a>
+            </p>
+            {% endif %}
+
+            <!-- Skip login (guest mode) -->
+            <div class="text-center mt-3">
+                <a href="/" class="text-xs text-base-content/40 hover:text-base-content/60">
+                    Continue as guest →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    lucide.createIcons();
+    // Fix logo visibility based on theme
+    (function(){
+        const theme = document.documentElement.getAttribute('data-theme');
+        const dark = document.getElementById('logo-dark');
+        const light = document.getElementById('logo-light');
+        if (theme === 'light') {
+            if (dark) dark.style.display = 'none';
+            if (light) light.style.display = 'block';
+        }
+    })();
+    </script>
+</body>
+</html>

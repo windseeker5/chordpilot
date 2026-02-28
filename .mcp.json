@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kd-ui": {
+      "command": "/home/kdresdell/Documents/DEV/kdui_mcp/venv/bin/python",
+      "args": ["-m", "kd_ui_server.server"],
+      "cwd": "/home/kdresdell/Documents/DEV/kdui_mcp/mcp-server"
+    }
+  }
+}

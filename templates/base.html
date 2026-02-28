@@ -3,137 +3,437 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Guitar Practice App{% endblock %}</title>
+    <title>{% block title %}ChordPilot{% endblock %}</title>
 
-    <!-- Tailwind CSS + DaisyUI -->
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <!-- DaisyUI + Tailwind -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        /* TV-optimized styles */
-        body {
-            font-size: 18px;
-            line-height: 1.6;
+        /* ── Layout ── */
+        html, body { background: #ffffff !important; font-size: 14px; }
+        [data-theme="dark"] html,
+        [data-theme="dark"] body { background: oklch(var(--b1)) !important; }
+
+        .sidebar {
+            width: 220px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--sidebar-bg, #ffffff);
+            border-right: 1px solid var(--sidebar-border, #e5e7eb);
+            flex-shrink: 0;
         }
 
-        /* Smooth scrolling for auto-scroll feature */
-        html {
-            scroll-behavior: smooth;
-        }
+        /* Light theme */
+        [data-theme="light"] .sidebar { --sidebar-bg: #ffffff; --sidebar-border: #e5e7eb; }
+        /* Dark theme */
+        [data-theme="dark"]  .sidebar { --sidebar-bg: oklch(var(--b2)); --sidebar-border: oklch(var(--b3)); }
 
-        /* Chord positioning styles */
-        .chord-line {
+        /* ── Nav items ── */
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: oklch(var(--bc) / 0.7);
+            text-decoration: none;
+            transition: background 0.12s, color 0.12s;
             position: relative;
-            min-height: 3rem;
+            margin-bottom: 1px;
+        }
+        .nav-item:hover { background: #f5f5f5; }
+        .nav-item.active { background: transparent; color: #3b82f6; font-weight: 500; }
+        .nav-item.active::before { display: none; }
+        .nav-item svg { flex-shrink: 0; opacity: 0.7; }
+        .nav-item.active svg { opacity: 1; }
+        [data-theme="dark"] .nav-item:hover { background: oklch(var(--b3)/0.5); }
+        [data-theme="dark"] .nav-item.active { color: oklch(var(--p)); }
+
+        /* ── Topbar ── */
+        .topbar {
+            height: 48px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+        }
+        [data-theme="dark"] .topbar { background: oklch(var(--b1)); }
+
+        /* ── Logo area ── */
+        .sidebar-logo {
+            padding: 16px 14px 12px;
+        }
+        .sidebar-logo img { height: 26px; }
+
+        /* Logo theme switching */
+        .logo-light { display: block; }
+        .logo-dark  { display: none; }
+        [data-theme="dark"] .logo-light { display: none; }
+        [data-theme="dark"] .logo-dark  { display: block; }
+
+        /* ── Nav section label ── */
+        .nav-section-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: oklch(var(--bc) / 0.4);
+            padding: 12px 12px 4px;
         }
 
-        .chord-segment {
-            margin-right: 0.25rem;
+        /* ── Notification badge ── */
+        .notif-badge {
+            position: absolute;
+            top: -3px; right: -3px;
+            min-width: 16px; height: 16px;
+            border-radius: 8px;
+            background: oklch(var(--er));
+            color: white;
+            font-size: 9px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 3px;
         }
 
-        /* Make sure chords don't overlap */
-        .chord {
-            pointer-events: none;
-            user-select: none;
-        }
+        /* ── Content ── */
+        .page-main { flex: 1; background: #ffffff; overflow-y: auto; }
+        [data-theme="dark"] .page-main { background: oklch(var(--b1)); }
 
-        /* Large, readable text for TV display */
-        .song-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
+        /* ── ChordPro rendering ── */
+        html { scroll-behavior: smooth; }
+        .chord-line { position: relative; min-height: 2.4rem; }
+        .chord-segment { margin-right: 0.2rem; }
+        .chord { pointer-events: none; user-select: none; }
+        .song-content { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        .verse  { margin-bottom: 1.5rem; }
+        .chorus { margin-bottom: 1.5rem; padding-left: 1.5rem; border-left: 3px solid oklch(var(--p)); }
 
-        /* Verse and chorus styling */
-        .verse {
-            margin-bottom: 2rem;
+        /* ── kdui_mcp Button System ── */
+        .cp-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 6px; border-radius: 4px; font-weight: 500; font-size: 0.875rem;
+            line-height: 1; white-space: nowrap; cursor: pointer;
+            border: 1px solid transparent; height: 36px; padding: 0 16px;
+            text-decoration: none; transition: filter 0.12s, background 0.12s;
+            flex-shrink: 0;
         }
-
-        .chorus {
-            margin-bottom: 2rem;
-            padding-left: 2rem;
-            border-left: 4px solid #3b82f6;
-        }
-
-        /* Sidebar styles */
-        .drawer-side {
-            z-index: 1000;
-        }
+        .cp-btn:hover:not(:disabled) { filter: brightness(0.92); }
+        .cp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .cp-btn-primary   { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+        .cp-btn-secondary { background:#64748b; color:#fff; border-color:#64748b; }
+        .cp-btn-ghost     { background:transparent; color:#374151; border-color:#d1d5db; }
+        .cp-btn-ghost:hover { filter:none; background:#f3f4f6; }
+        .cp-btn-danger    { background:#ef4444; color:#fff; border-color:#ef4444; }
+        [data-theme="dark"] .cp-btn-ghost { color:oklch(var(--bc)/0.7); border-color:oklch(var(--b3)); }
+        [data-theme="dark"] .cp-btn-ghost:hover { background:oklch(var(--b3)); filter:none; }
+        .cp-btn-sm { height:30px; padding:0 10px; font-size:0.8rem; }
+        .cp-btn-lg { height:44px; padding:0 20px; font-size:0.9375rem; }
+        .cp-btn-icon { width:30px; height:30px; padding:0; }
+        .cp-btn-circle { border-radius:50%; width:36px; padding:0; }
+        .cp-btn-circle.cp-btn-sm { width:30px; height:30px; }
+        .cp-btn-circle.cp-btn-lg { width:44px; height:44px; }
     </style>
 
     {% block extra_styles %}{% endblock %}
 </head>
-<body class="bg-base-100 min-h-screen">
-    <div class="drawer lg:drawer-open">
-        <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
 
-        <div class="drawer-content flex flex-col">
-            <!-- Navigation Bar -->
-            <div class="navbar bg-base-200 shadow-lg">
-                <div class="flex-none lg:hidden">
-                    <label for="sidebar-drawer" class="btn btn-square btn-ghost">
-                        <i data-lucide="menu" class="w-6 h-6"></i>
-                    </label>
-                </div>
-                <div class="flex-1">
-                    <a href="/" class="btn btn-ghost normal-case text-2xl">
-                        <i data-lucide="music" class="w-8 h-8 mr-2"></i>
-                        Guitar Practice
-                    </a>
-                </div>
-                <div class="flex-none">
-                    {% block nav_buttons %}{% endblock %}
-                </div>
+<body class="text-base-content" style="background:#ffffff">
+
+<!-- Apply saved theme immediately (before paint) -->
+<script>
+(function() {
+    var t = localStorage.getItem('cp-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+<!-- ══════════════════════════════════════════
+     OUTER WRAPPER: sidebar + main side by side
+═══════════════════════════════════════════════ -->
+<div class="flex min-h-screen">
+
+    <!-- ── SIDEBAR ───────────────────────────── -->
+    <aside class="sidebar hidden lg:flex flex-col">
+
+        <!-- Logo -->
+        <div class="sidebar-logo">
+            <a href="/">
+                <img src="{{ url_for('static', filename='images/chordpilot-logo-black.png') }}"
+                     alt="ChordPilot" class="logo-light" />
+                <img src="{{ url_for('static', filename='images/chordpilot-logo-white.png') }}"
+                     alt="ChordPilot" class="logo-dark" />
+            </a>
+        </div>
+
+        <!-- Nav -->
+        <nav class="flex-1 px-3 pt-3 overflow-y-auto">
+
+            <a href="/"
+               class="nav-item {% if request.endpoint == 'home_page' %}active{% endif %}">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                Home
+            </a>
+
+            <a href="/library"
+               class="nav-item {% if request.endpoint == 'library_page' %}active{% endif %}">
+                <i data-lucide="library" class="w-4 h-4"></i>
+                Library
+            </a>
+
+            <a href="/tuner"
+               class="nav-item {% if request.endpoint == 'tuner_page' %}active{% endif %}">
+                <i data-lucide="music" class="w-4 h-4"></i>
+                Tuner
+            </a>
+
+            <a href="/settings"
+               class="nav-item {% if request.endpoint == 'settings_page' %}active{% endif %}">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                Settings
+            </a>
+
+            <a href="/logout" class="nav-item" style="color:oklch(var(--er)/0.7);"
+               onmouseover="this.style.color='oklch(var(--er))'"
+               onmouseout="this.style.color='oklch(var(--er)/0.7)'">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                Log out
+            </a>
+        </nav>
+
+        <!-- Footer version -->
+        <div class="px-3 py-3">
+            <span class="text-xs text-base-content/30 select-none">ChordPilot v{{ git_version }}</span>
+        </div>
+    </aside>
+
+    <!-- ── RIGHT SIDE: topbar + content ──────── -->
+    <div class="flex flex-col flex-1 min-w-0">
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <!-- Mobile hamburger -->
+            <button class="cp-btn cp-btn-ghost cp-btn-icon lg:hidden" onclick="toggleMobileSidebar()">
+                <i data-lucide="menu" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Page breadcrumb / title -->
+            <div class="flex-1 text-sm font-medium text-base-content/60">
+                {% block page_title %}{% endblock %}
             </div>
 
-            <!-- Main Content -->
-            <main class="flex-1 p-4">
-                {% block content %}{% endblock %}
-            </main>
-        </div>
+            <!-- Right controls -->
+            <div class="flex items-center gap-1">
 
-        <!-- Sidebar -->
-        <div class="drawer-side">
-            <label for="sidebar-drawer" class="drawer-overlay"></label>
-            <aside class="bg-base-200 w-64 min-h-full">
-                <div class="p-4">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center">
-                        <i data-lucide="guitar" class="w-6 h-6 mr-2"></i>
-                        Menu
-                    </h2>
-                    <ul class="menu text-lg">
-                        <li>
-                            <a href="/" class="{% if request.endpoint == 'index' %}active{% endif %}">
-                                <i data-lucide="home" class="w-5 h-5"></i>
-                                Home
+                {% block nav_buttons %}{% endblock %}
+
+                <!-- Theme toggle -->
+                <button id="theme-btn" title="Toggle theme"
+                        style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;color:oklch(var(--bc)/0.5);border-radius:4px;"
+                        onmouseover="this.style.color='oklch(var(--bc))'"
+                        onmouseout="this.style.color='oklch(var(--bc)/0.5)'">
+                    <i data-lucide="sun"  style="width:18px;height:18px;display:none;" id="icon-sun"></i>
+                    <i data-lucide="moon" style="width:18px;height:18px;display:none;" id="icon-moon"></i>
+                </button>
+
+                <!-- User avatar with Gravatar + notification dot -->
+                {% if current_user %}
+                <div class="dropdown dropdown-end">
+                    <!-- Trigger button -->
+                    <button tabindex="0"
+                            onclick="loadNotifications()"
+                            style="position:relative;width:34px;height:34px;padding:0;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                        <!-- Gravatar -->
+                        <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;ring:1px solid oklch(var(--b3));">
+                            <img src="{{ gravatar_url }}"
+                                 alt="{{ current_user.username[0].upper() }}"
+                                 style="width:100%;height:100%;object-fit:cover;border-radius:50%;"
+                                 onerror="this.style.display='none';" />
+                        </div>
+                        <!-- Notification dot -->
+                        <span id="notif-dot"
+                              style="position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ef4444;border:2px solid white;display:{% if unread_count > 0 %}block{% else %}none{% endif %};"></span>
+                    </button>
+
+                    <!-- Dropdown panel -->
+                    <div tabindex="0"
+                         class="dropdown-content z-50 shadow-xl bg-base-100 border border-base-300"
+                         style="border-radius:10px;width:270px;margin-top:8px;overflow:hidden;">
+
+                        <!-- User header -->
+                        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid oklch(var(--b3));">
+                            <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;">
+                                <img src="{{ gravatar_url }}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+                            </div>
+                            <div style="min-width:0;">
+                                <div style="font-weight:600;font-size:0.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                    {{ current_user.username }}
+                                </div>
+                                <div style="font-size:0.6875rem;color:oklch(var(--bc)/0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                    {{ current_user.email if current_user.email else '' }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notifications section -->
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid oklch(var(--b3));">
+                            <span style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:oklch(var(--bc)/0.5);">
+                                Notifications
+                            </span>
+                            <button onclick="markAllRead()"
+                                    style="font-size:0.6875rem;color:oklch(var(--bc)/0.4);background:none;border:none;cursor:pointer;padding:0;"
+                                    onmouseover="this.style.color='oklch(var(--bc))'"
+                                    onmouseout="this.style.color='oklch(var(--bc)/0.4)'">
+                                Mark all read
+                            </button>
+                        </div>
+                        <ul id="notif-list" style="max-height:180px;overflow-y:auto;padding:4px 0;margin:0;list-style:none;">
+                            <li style="padding:8px 14px;font-size:0.75rem;color:oklch(var(--bc)/0.4);">Loading…</li>
+                        </ul>
+
+                        <!-- Logout -->
+                        <div style="border-top:1px solid oklch(var(--b3));padding:4px;">
+                            <a href="/logout"
+                               style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:0.875rem;color:oklch(var(--er)/0.8);text-decoration:none;transition:background 0.1s;"
+                               onmouseover="this.style.background='oklch(var(--b2))'"
+                               onmouseout="this.style.background='transparent'">
+                                <i data-lucide="log-out" style="width:14px;height:14px;"></i>
+                                Log out
                             </a>
-                        </li>
-                        <li>
-                            <a href="/library" class="{% if request.endpoint == 'library' %}active{% endif %}">
-                                <i data-lucide="library" class="w-5 h-5"></i>
-                                Library
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/settings" class="{% if request.endpoint == 'settings_page' %}active{% endif %}">
-                                <i data-lucide="settings" class="w-5 h-5"></i>
-                                Settings
-                            </a>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 </div>
-            </aside>
-        </div>
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- PAGE CONTENT -->
+        <main class="page-main p-5 lg:p-6">
+            {% block content %}{% endblock %}
+        </main>
     </div>
+</div>
 
-    <!-- Initialize Lucide Icons -->
-    <script>
-        lucide.createIcons();
-    </script>
+<!-- ── MOBILE SIDEBAR OVERLAY ──────────────── -->
+<div id="mobile-overlay"
+     class="fixed inset-0 z-50 hidden"
+     onclick="toggleMobileSidebar()">
+    <div class="absolute inset-0 bg-black/30"></div>
+    <aside class="sidebar absolute left-0 top-0 h-full shadow-xl flex flex-col">
+        <div class="sidebar-logo flex items-center justify-between pr-3">
+            <a href="/">
+                <img src="{{ url_for('static', filename='images/chordpilot-logo-black.png') }}"
+                     alt="ChordPilot" class="logo-light" />
+                <img src="{{ url_for('static', filename='images/chordpilot-logo-white.png') }}"
+                     alt="ChordPilot" class="logo-dark" />
+            </a>
+            <button class="cp-btn cp-btn-ghost cp-btn-icon" onclick="toggleMobileSidebar()">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <nav class="flex-1 px-3 pt-3 overflow-y-auto" onclick="event.stopPropagation()">
+            <a href="/" class="nav-item {% if request.endpoint == 'home_page' %}active{% endif %}">
+                <i data-lucide="home" class="w-4 h-4"></i> Home
+            </a>
+            <a href="/library" class="nav-item {% if request.endpoint == 'library_page' %}active{% endif %}">
+                <i data-lucide="library" class="w-4 h-4"></i> Library
+            </a>
+            <a href="/tuner"  class="nav-item {% if request.endpoint == 'tuner_page' %}active{% endif %}">
+                <i data-lucide="music" class="w-4 h-4"></i> Tuner
+            </a>
+            <a href="/settings" class="nav-item {% if request.endpoint == 'settings_page' %}active{% endif %}">
+                <i data-lucide="settings" class="w-4 h-4"></i> Settings
+            </a>
+            <a href="/logout" class="nav-item" style="color:oklch(var(--er)/0.7);">
+                <i data-lucide="log-out" class="w-4 h-4"></i> Log out
+            </a>
+        </nav>
+        <div class="px-3 py-3">
+            <span class="text-xs text-base-content/30">ChordPilot v{{ git_version }}</span>
+        </div>
+    </aside>
+</div>
 
-    {% block extra_scripts %}{% endblock %}
+<!-- Icons init -->
+<script>lucide.createIcons();</script>
+
+<!-- Theme toggle -->
+<script>
+(function() {
+    var html = document.documentElement;
+    var btn = document.getElementById('theme-btn');
+    var sunIcon  = document.getElementById('icon-sun');
+    var moonIcon = document.getElementById('icon-moon');
+
+    function applyTheme(t) {
+        html.setAttribute('data-theme', t);
+        localStorage.setItem('cp-theme', t);
+        // In light mode show moon (click → go dark); in dark mode show sun (click → go light)
+        if (t === 'light') {
+            sunIcon.style.display = 'none';
+            moonIcon.style.display = 'block';
+        } else {
+            moonIcon.style.display = 'none';
+            sunIcon.style.display = 'block';
+        }
+    }
+
+    // Init from saved
+    applyTheme(localStorage.getItem('cp-theme') || 'light');
+
+    btn.addEventListener('click', function() {
+        applyTheme(html.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    });
+})();
+</script>
+
+<!-- Notifications -->
+<script>
+async function loadNotifications() {
+    try {
+        const res = await fetch('/api/notifications');
+        const data = await res.json();
+        const list = document.getElementById('notif-list');
+        const dot = document.getElementById('notif-dot');
+        if (dot) dot.style.display = data.unread > 0 ? 'block' : 'none';
+        if (!list) return;
+        if (!data.notifications?.length) {
+            list.innerHTML = '<li style="padding:8px 14px;font-size:0.75rem;color:oklch(var(--bc)/0.4);">No notifications</li>';
+            return;
+        }
+        list.innerHTML = data.notifications.map(n => `
+            <li style="padding:7px 14px;font-size:0.75rem;cursor:default;transition:background 0.1s;${n.read ? 'opacity:0.5;' : 'font-weight:500;'}"
+                onmouseover="this.style.background='oklch(var(--b2))'"
+                onmouseout="this.style.background='transparent'">
+                ${n.message}
+                <div style="font-size:0.6875rem;color:oklch(var(--bc)/0.35);margin-top:2px;">${n.created_at?.substring(0,10) || ''}</div>
+            </li>`).join('');
+    } catch(e) {}
+}
+async function markAllRead() {
+    await fetch('/api/notifications/read', {method:'POST'});
+    const dot = document.getElementById('notif-dot');
+    if (dot) dot.style.display = 'none';
+    loadNotifications();
+}
+</script>
+
+<!-- Mobile sidebar -->
+<script>
+function toggleMobileSidebar() {
+    document.getElementById('mobile-overlay').classList.toggle('hidden');
+    lucide.createIcons();
+}
+</script>
+
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

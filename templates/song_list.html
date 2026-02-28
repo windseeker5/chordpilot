@@ -1,56 +1,500 @@
 {% extends "base.html" %}
 
-{% block title %}Song List - Guitar Practice App{% endblock %}
+{% block title %}My Library — ChordPilot{% endblock %}
+{% block page_title %}My Library{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-8">
-    <h1 class="text-5xl font-bold mb-8 text-center">My Songs</h1>
+<div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold">My Library</h1>
+            <p class="text-base-content/60 mt-1">{{ songs|length }} song{{ 's' if songs|length != 1 }}</p>
+        </div>
+        <button onclick="showAddSongModal()" class="cp-btn cp-btn-primary gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Add Song
+        </button>
+    </div>
+
+    <!-- yt-dlp warning -->
+    {% if not ytdlp_installed %}
+    <div class="alert alert-warning mb-4">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        <div>
+            <div class="font-bold">yt-dlp not installed</div>
+            <div class="text-sm">YouTube download disabled. Install with: <code class="bg-base-300 px-1.5 py-0.5 rounded text-xs">pip install yt-dlp</code></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Ollama AI status (shown only when enabled) -->
+    <div id="ollamaStatus" class="alert hidden mb-4">
+        <i data-lucide="cpu" class="w-5 h-5"></i>
+        <span id="ollamaStatusMessage">Checking AI status…</span>
+    </div>
+
+    <!-- Search bar -->
+    <div class="mb-6">
+        <label class="input input-bordered flex items-center gap-2 max-w-sm">
+            <i data-lucide="search" class="w-4 h-4 text-base-content/50"></i>
+            <input type="text" id="dashSearch"
+                   placeholder="Search songs by title or artist…"
+                   class="grow text-sm"
+                   oninput="filterCards()" />
+        </label>
+    </div>
 
     {% if songs %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Card grid: 1 → 2 → 3 columns -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         {% for song in songs %}
-        <div class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow">
-            <div class="card-body">
-                <h2 class="card-title text-3xl">
-                    <i data-lucide="music" class="w-8 h-8"></i>
-                    {{ song.title }}
-                </h2>
-                <p class="text-xl text-base-content/70">
-                    <i data-lucide="user" class="w-5 h-5 inline"></i>
-                    {{ song.artist }}
-                </p>
-
-                {% if song.key %}
-                <div class="badge badge-secondary badge-lg text-lg">
-                    Key of {{ song.key }}
+        <div class="song-card card bg-base-200 hover:bg-base-300 shadow-md hover:shadow-xl transition-all duration-200"
+             data-title="{{ song.title|lower }}"
+             data-artist="{{ (song.artist or '')|lower }}">
+            <div class="card-body p-5">
+                <!-- Icon + Title + More button -->
+                <div class="flex items-start gap-3">
+                    <div class="p-2 rounded-lg bg-primary/10 text-primary mt-0.5 shrink-0">
+                        <i data-lucide="music-2" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="card-title text-lg leading-tight truncate">{{ song.title }}</h2>
+                        <p class="text-base-content/60 text-sm truncate mt-0.5">
+                            {{ song.artist or 'Unknown Artist' }}
+                        </p>
+                    </div>
+                    <button class="cp-btn cp-btn-ghost cp-btn-icon shrink-0"
+                            onclick="openDropdown('{{ song.song_id }}', '{{ song.title | replace("'", "\\'") }}', this)"
+                            title="More actions">
+                        <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+                    </button>
                 </div>
-                {% endif %}
 
-                <div class="card-actions justify-end mt-4">
-                    <a href="/song/{{ song.id }}" class="btn btn-primary btn-lg">
-                        <i data-lucide="play" class="w-6 h-6"></i>
-                        Play
+                <!-- Metadata badges -->
+                <div class="flex flex-wrap gap-2 mt-3">
+                    {% if song.key %}
+                    <span class="badge badge-secondary badge-sm">Key of {{ song.key }}</span>
+                    {% endif %}
+                    {% if song.play_count %}
+                    <span class="badge badge-ghost badge-sm">{{ song.play_count }} play{{ 's' if song.play_count != 1 }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Footer: date + practice -->
+                <div class="card-actions justify-between items-center mt-4">
+                    <span class="text-xs text-base-content/40">
+                        {% if song.date_added %}Added {{ song.date_added[:10] }}{% endif %}
+                    </span>
+                    <a href="/song/{{ song.song_id }}" class="cp-btn cp-btn-primary cp-btn-sm gap-1">
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                        Practice
                     </a>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
+
+    <!-- No search results message (hidden by default) -->
+    <div id="no-results" class="hidden flex flex-col items-center justify-center py-16 text-center">
+        <i data-lucide="search-x" class="w-10 h-10 text-base-content/30 mb-3"></i>
+        <p class="text-base-content/60">No songs match your search.</p>
+    </div>
+
     {% else %}
-    <div class="alert alert-info text-xl">
-        <i data-lucide="info" class="w-8 h-8"></i>
-        <div>
-            <h3 class="font-bold text-2xl">No songs yet</h3>
-            <div class="text-lg">Add songs to the <code class="bg-base-300 px-2 py-1 rounded">static/songs/</code> directory and update <code class="bg-base-300 px-2 py-1 rounded">songs.json</code></div>
+    <!-- Empty state (no songs at all) -->
+    <div class="flex flex-col items-center justify-center py-24 text-center">
+        <div class="p-5 rounded-full bg-base-200 mb-5">
+            <i data-lucide="music-2" class="w-12 h-12 text-base-content/30"></i>
         </div>
+        <h3 class="text-2xl font-bold mb-2">No songs yet</h3>
+        <p class="text-base-content/60 mb-6 max-w-xs">
+            Add your first song to start practicing guitar chords.
+        </p>
+        <button onclick="showAddSongModal()" class="cp-btn cp-btn-primary gap-2">
+            <i data-lucide="plus" class="w-5 h-5"></i>
+            Add Your First Song
+        </button>
     </div>
     {% endif %}
+
 </div>
 
+<!-- ───────── ADD SONG MODAL ───────── -->
+<dialog id="addSongModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box w-11/12 max-w-4xl">
+        <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-6 h-6 text-primary"></i>
+            Add New Song
+        </h3>
+
+        <!-- Search Form -->
+        <div class="form-control mb-5">
+            <label class="label"><span class="label-text font-medium">Search for a song</span></label>
+            <div class="flex w-full gap-2">
+                <input id="searchInput" type="text"
+                       placeholder="e.g. Let It Be - Beatles"
+                       class="input input-bordered flex-1" />
+                <button onclick="searchSongs()" class="cp-btn cp-btn-primary gap-1">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="hidden">
+            <div class="divider">Search Results</div>
+
+            <div class="mb-5">
+                <h4 class="font-bold mb-2 flex items-center gap-1.5">
+                    <i data-lucide="youtube" class="w-4 h-4 text-error"></i>
+                    Audio (YouTube)
+                </h4>
+                <div id="youtubeResults" class="space-y-2"></div>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="font-bold mb-2 flex items-center gap-1.5">
+                    <i data-lucide="music" class="w-4 h-4 text-primary"></i>
+                    Guitar Chords
+                </h4>
+                <div id="chordsResults" class="space-y-2"></div>
+            </div>
+
+            <div class="modal-action">
+                <button onclick="addSelectedSong()" class="cp-btn cp-btn-primary gap-1">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    Add to Library
+                </button>
+                <button onclick="closeAddSongModal()" class="cp-btn cp-btn-ghost">Cancel</button>
+            </div>
+        </div>
+
+        <div class="divider text-sm">OR</div>
+        <button onclick="showManualEntry()" class="cp-btn cp-btn-ghost w-full gap-1">
+            <i data-lucide="edit" class="w-4 h-4"></i>
+            Enter Song Details Manually
+        </button>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ───────── MANUAL CHORDS MODAL ───────── -->
+<dialog id="manualChordsModal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box w-11/12 max-w-3xl">
+        <h3 class="font-bold text-2xl mb-4 flex items-center gap-2">
+            <i data-lucide="music" class="w-6 h-6 text-primary"></i>
+            Add Chords Manually
+        </h3>
+
+        <div class="alert alert-info mb-4 text-sm">
+            <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+            <div>
+                <p class="font-medium">Automatic chord fetching didn't work for this song.</p>
+                <p>Paste chords from Ultimate Guitar or any other source below.</p>
+            </div>
+        </div>
+
+        <div id="manualChordsSongInfo" class="mb-4 p-3 bg-base-200 rounded-lg text-sm">
+            <p><span class="font-semibold">Song:</span> <span id="manualChordsSongTitle"></span></p>
+            <p><span class="font-semibold">Artist:</span> <span id="manualChordsSongArtist"></span></p>
+        </div>
+
+        <div class="mb-4">
+            <a id="ultimateGuitarLink" href="#" target="_blank" class="cp-btn cp-btn-secondary w-full gap-1">
+                <i data-lucide="external-link" class="w-4 h-4"></i>
+                Open Ultimate Guitar in New Tab
+            </a>
+        </div>
+
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text font-medium">Paste chords here:</span>
+                <span class="label-text-alt text-xs">Copy from Ultimate Guitar</span>
+            </label>
+            <textarea id="rawChordsInput" class="textarea textarea-bordered h-72 font-mono text-sm"
+                placeholder="[Verse 1]&#10;     C              G&#10;Look at the stars&#10;     Am             F&#10;Look how they shine for you"></textarea>
+        </div>
+
+        <div class="alert alert-warning text-sm mb-4">
+            <i data-lucide="lightbulb" class="w-4 h-4 shrink-0"></i>
+            <p>Include section markers like [Verse 1], [Chorus], etc. Chords will auto-convert to ChordPro format.</p>
+        </div>
+
+        <div class="modal-action">
+            <button onclick="convertAndSaveChords()" class="cp-btn cp-btn-primary gap-1">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                Convert &amp; Save
+            </button>
+            <button onclick="skipManualChords()" class="cp-btn cp-btn-ghost">Skip</button>
+            <button onclick="closeManualChordsModal()" class="cp-btn cp-btn-ghost">Cancel</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 <script>
-    // Reinitialize icons after page load
-    document.addEventListener('DOMContentLoaded', () => {
-        lucide.createIcons();
+let selectedYoutube = null;
+let selectedChords = null;
+let youtubeResultsData = [];
+let chordsResultsData = [];
+let currentSongId = null;
+
+// ── Live search ──
+function filterCards() {
+    const q = document.getElementById('dashSearch').value.toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('.song-card').forEach(card => {
+        const match = card.dataset.title.includes(q) || card.dataset.artist.includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visible++;
     });
+    const noResults = document.getElementById('no-results');
+    if (noResults) {
+        noResults.classList.toggle('hidden', visible > 0 || q === '');
+    }
+}
+
+// ── Per-card dropdown ──
+function openDropdown(songId, title, triggerEl) {
+    const existing = document.getElementById('cp-dropdown');
+    if (existing) {
+        const wasSameTrigger = existing._trigger === triggerEl;
+        existing.remove();
+        if (wasSameTrigger) return;
+    }
+
+    const safeTitle = title.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+    const menu = document.createElement('div');
+    menu.id = 'cp-dropdown';
+    menu._trigger = triggerEl;
+    menu.style.cssText = 'position:fixed;z-index:9999;width:180px;';
+    menu.className = 'rounded-md border border-base-300 bg-base-100 p-1 shadow-lg';
+    menu.innerHTML = `
+        <a href="/song/${songId}"
+           class="flex items-center gap-2 px-3 py-2 text-sm rounded cursor-pointer hover:bg-base-200 text-base-content">
+            <i data-lucide="play" class="w-4 h-4 text-primary"></i>
+            Practice
+        </a>
+        <div class="my-1 h-px bg-base-300"></div>
+        <button onclick="deleteSong('${songId}', '${safeTitle}'); document.getElementById('cp-dropdown')?.remove();"
+                class="flex items-center gap-2 px-3 py-2 text-sm rounded cursor-pointer hover:bg-error/10 text-error w-full text-left">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            Delete
+        </button>
+    `;
+
+    // Position: below trigger, right-aligned; flip up near viewport bottom
+    const rect = triggerEl.getBoundingClientRect();
+    const menuW = 180;
+    let top = rect.bottom + 4;
+    let left = rect.right - menuW;
+    if (top + 110 > window.innerHeight) top = rect.top - 110;
+    if (left < 4) left = 4;
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+
+    document.body.appendChild(menu);
+    lucide.createIcons();
+
+    function close(e) {
+        if (!menu.contains(e.target) && e.target !== triggerEl) {
+            menu.remove();
+            cleanup();
+        }
+    }
+    function closeOnEsc(e) {
+        if (e.key === 'Escape') { menu.remove(); cleanup(); }
+    }
+    function closeOnScroll() { menu.remove(); cleanup(); }
+    function cleanup() {
+        document.removeEventListener('click', close);
+        document.removeEventListener('keydown', closeOnEsc);
+        window.removeEventListener('scroll', closeOnScroll, true);
+    }
+    setTimeout(() => {
+        document.addEventListener('click', close);
+        document.addEventListener('keydown', closeOnEsc);
+        window.addEventListener('scroll', closeOnScroll, true);
+    }, 0);
+}
+
+// ── Modal open/close ──
+function showAddSongModal() {
+    document.getElementById('addSongModal').showModal();
+    lucide.createIcons();
+}
+function closeAddSongModal() { document.getElementById('addSongModal').close(); }
+
+// ── Song search ──
+async function searchSongs() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
+
+    document.getElementById('searchResults').classList.remove('hidden');
+    document.getElementById('youtubeResults').innerHTML = '<div class="loading loading-spinner loading-md"></div>';
+    document.getElementById('chordsResults').innerHTML = '<div class="loading loading-spinner loading-md"></div>';
+
+    try {
+        const [ytRes, chRes] = await Promise.all([
+            fetch(`/api/search/youtube?q=${encodeURIComponent(query)}`),
+            fetch(`/api/search/chords?q=${encodeURIComponent(query)}`)
+        ]);
+        youtubeResultsData = await ytRes.json();
+        chordsResultsData = await chRes.json();
+        displayYoutubeResults(youtubeResultsData);
+        displayChordsResults(chordsResultsData);
+        lucide.createIcons();
+    } catch (err) {
+        console.error(err);
+        alert('Search failed. Please try again.');
+    }
+}
+
+function displayYoutubeResults(results) {
+    const c = document.getElementById('youtubeResults');
+    if (!results?.length) { c.innerHTML = '<p class="text-sm text-base-content/50">No YouTube results found</p>'; return; }
+    c.innerHTML = results.map((v, i) => `
+        <div class="card bg-base-300 cursor-pointer hover:bg-base-100 transition ${i===0?'ring-2 ring-primary':''}" onclick="selectYoutube(${i})">
+            <div class="card-body p-3 flex-row items-center gap-3">
+                <img src="${v.thumbnail}" class="w-20 h-14 rounded object-cover shrink-0" />
+                <div class="min-w-0 flex-1">
+                    <div class="font-medium text-sm truncate">${v.title}</div>
+                    <div class="text-xs text-base-content/50">${v.channel} • ${v.duration_string}</div>
+                </div>
+                <i data-lucide="check-circle" class="w-5 h-5 shrink-0 text-primary ${i===0?'':'hidden'}" id="yt-check-${i}"></i>
+            </div>
+        </div>`).join('');
+    selectedYoutube = results[0];
+    lucide.createIcons();
+}
+
+function displayChordsResults(results) {
+    const c = document.getElementById('chordsResults');
+    if (!results?.length) { c.innerHTML = '<p class="text-sm text-base-content/50">No chord results found</p>'; return; }
+    c.innerHTML = results.map((ch, i) => `
+        <div class="card bg-base-300 cursor-pointer hover:bg-base-100 transition ${i===0?'ring-2 ring-primary':''}" onclick="selectChords(${i})">
+            <div class="card-body p-3 flex-row items-center justify-between">
+                <div class="min-w-0 flex-1">
+                    <div class="font-medium text-sm">${ch.title} — ${ch.artist}</div>
+                    <div class="text-xs text-base-content/50">${ch.type} • ★ ${ch.rating}/5 (${ch.votes} votes)</div>
+                </div>
+                <i data-lucide="check-circle" class="w-5 h-5 shrink-0 text-primary ${i===0?'':'hidden'}" id="chord-check-${i}"></i>
+            </div>
+        </div>`).join('');
+    selectedChords = results[0];
+    lucide.createIcons();
+}
+
+function selectYoutube(i) {
+    document.querySelectorAll('[id^="yt-check-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`yt-check-${i}`)?.classList.remove('hidden');
+    selectedYoutube = youtubeResultsData[i];
+}
+function selectChords(i) {
+    document.querySelectorAll('[id^="chord-check-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`chord-check-${i}`)?.classList.remove('hidden');
+    selectedChords = chordsResultsData[i];
+}
+
+async function addSelectedSong() {
+    if (!selectedYoutube && !selectedChords) { alert('Select at least a YouTube video or chords.'); return; }
+    const searchQuery = document.getElementById('searchInput').value.trim();
+    const data = {
+        title: selectedChords?.title || selectedYoutube?.title || 'Unknown',
+        artist: selectedChords?.artist || 'Unknown',
+        youtube_url: selectedYoutube?.url || '',
+        chords_url: selectedChords?.url || '',
+        chords_content: selectedChords?.chords_content || '',
+        key: '',
+        search_query: searchQuery
+    };
+    try {
+        const res = await fetch('/library/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+        const result = await res.json();
+        if (result.success) {
+            closeAddSongModal();
+            if (selectedChords?.url === 'manual') {
+                showManualChordsModal(result.song_id, data.title, data.artist, searchQuery);
+            } else {
+                alert('Song added! Download in progress…');
+                location.reload();
+            }
+        } else { alert('Error: ' + result.error); }
+    } catch(e) { alert('Failed to add song.'); }
+}
+
+async function deleteSong(songId, title) {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+        const res = await fetch(`/library/delete/${songId}`, {method:'POST'});
+        const result = await res.json();
+        if (result.success) location.reload();
+        else alert('Error: ' + result.error);
+    } catch(e) { alert('Failed to delete song.'); }
+}
+
+function showManualEntry() { alert('Add song first, then edit the chords.cho file manually.'); }
+
+// ── Manual Chords Modal ──
+function showManualChordsModal(songId, title, artist, searchQuery) {
+    currentSongId = songId;
+    document.getElementById('manualChordsSongTitle').textContent = title;
+    document.getElementById('manualChordsSongArtist').textContent = artist;
+    document.getElementById('ultimateGuitarLink').href =
+        `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(searchQuery)}`;
+    document.getElementById('rawChordsInput').value = '';
+    document.getElementById('manualChordsModal').showModal();
+    lucide.createIcons();
+}
+function closeManualChordsModal() { document.getElementById('manualChordsModal').close(); currentSongId = null; }
+function skipManualChords() { closeManualChordsModal(); alert('Song added! You can add chords later.'); location.reload(); }
+
+async function convertAndSaveChords() {
+    const rawChords = document.getElementById('rawChordsInput').value.trim();
+    if (!rawChords) { alert('Please paste some chords first!'); return; }
+    if (!currentSongId) { alert('Error: No song ID found'); return; }
+    try {
+        const res = await fetch(`/library/manual-chords/${currentSongId}`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({raw_chords: rawChords})
+        });
+        const result = await res.json();
+        if (result.success) { closeManualChordsModal(); alert('Chords saved!'); location.reload(); }
+        else alert('Error: ' + result.error);
+    } catch(e) { alert('Failed to save chords.'); }
+}
+
+// ── Ollama status ──
+async function checkOllamaStatus() {
+    try {
+        const res = await fetch('/api/ollama-status');
+        const result = await res.json();
+        const div = document.getElementById('ollamaStatus');
+        const msg = document.getElementById('ollamaStatusMessage');
+        if (result.enabled && result.available) {
+            div.className = 'alert alert-success mb-4';
+            msg.textContent = '✓ ' + result.message;
+            div.classList.remove('hidden');
+        } else if (result.enabled && !result.available) {
+            div.className = 'alert alert-warning mb-4';
+            msg.textContent = '⚠ ' + result.message;
+            div.classList.remove('hidden');
+        }
+        lucide.createIcons();
+    } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('searchInput')?.addEventListener('keypress', e => {
+        if (e.key === 'Enter') searchSongs();
+    });
+    checkOllamaStatus();
+    lucide.createIcons();
+});
 </script>
 {% endblock %}
