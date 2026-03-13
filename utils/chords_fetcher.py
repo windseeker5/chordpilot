@@ -49,15 +49,8 @@ def search_songsterr(song_title: str, artist: str) -> Optional[str]:
         song_artist = song.get('artist', artist)  # artist is a string in Songsterr API
         print(f"[CHORDS] Found: '{song.get('title')}' by '{song_artist}'")
 
-        # Songsterr provides tab data in their own format
-        # For now, we'll create a basic chord template from the song info
-        # A full implementation would fetch and parse the actual tab data
-        chordpro = generate_songsterr_template(song, song_title, song_artist)
-
-        if chordpro:
-            print(f"[CHORDS] ✓ Songsterr template created ({len(chordpro)} chars)")
-            return chordpro
-
+        # Songsterr only provides metadata; tab content is Guitar Pro binary format.
+        print(f"[CHORDS] Songsterr: metadata only (no tab content available), skipping")
         return None
 
     except requests.exceptions.Timeout:
@@ -70,39 +63,10 @@ def search_songsterr(song_title: str, artist: str) -> Optional[str]:
 
 def generate_songsterr_template(song_data: dict, title: str, artist: str) -> Optional[str]:
     """
-    Generate a ChordPro template from Songsterr song data
-    Note: Songsterr uses Guitar Pro format which requires complex parsing
-    For now, we create a template indicating the source
+    Songsterr uses Guitar Pro binary format — no real tab text available via API.
+    Return None so the pipeline falls through to Ultimate Guitar or AI.
     """
-    try:
-        # Extract metadata - artist is a string in Songsterr API
-        song_title = song_data.get('title', title)
-        song_artist = song_data.get('artist', artist)
-
-        # Create a basic ChordPro template
-        # In a full implementation, we would parse the actual tab data
-        song_id = song_data.get('songId', song_data.get('id', 'unknown'))
-        chordpro = f"""{{title: {song_title}}}
-{{artist: {song_artist}}}
-{{comment: Source: Songsterr}}
-{{comment: Song ID: {song_id}}}
-
-{{comment: This is a simplified version. For full tabs visit:}}
-{{comment: https://www.songsterr.com/a/wsa/{song_artist.lower().replace(' ', '-')}-{song_title.lower().replace(' ', '-')}-tab-s{song_id}}}
-
-{{start_of_verse}}
-[Add chords and lyrics here]
-{{end_of_verse}}
-
-{{start_of_chorus}}
-[Chorus chords and lyrics]
-{{end_of_chorus}}
-"""
-        return chordpro
-
-    except Exception as e:
-        print(f"[CHORDS] Error generating Songsterr template: {e}")
-        return None
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -183,14 +147,21 @@ def search_ultimate_guitar(query: str, max_results: int = 5) -> List[Dict]:
 
 def fetch_chords_from_url(url: str) -> Optional[str]:
     """
-    Fetch chords content from Ultimate Guitar URL
-    Returns raw chord content (not yet ChordPro format)
+    Fetch chords content from Ultimate Guitar URL.
+    Returns raw chord content (not yet ChordPro format).
+
+    Strategy A: Parse div.js-store[data-content] (URL-encoded JSON).
+    Strategy B: Find window.UGAPP JSON blob using JSONDecoder boundary finder.
     """
     print(f"[CHORDS] Fetching from URL: {url}")
 
     try:
+        from urllib.parse import unquote
+
         headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
         }
 
         response = requests.get(url, headers=headers, timeout=10)
@@ -199,26 +170,35 @@ def fetch_chords_from_url(url: str) -> Optional[str]:
             print(f"[CHORDS] ✗ HTTP error: {response.status_code}")
             return None
 
-        print(f"[CHORDS] ✓ Got response, extracting content...")
+        print(f"[CHORDS] ✓ Got response ({len(response.text)} chars), extracting content...")
 
-        # Ultimate Guitar embeds tab content in JavaScript
-        match = re.search(r'window\.UGAPP\.store\.page\s*=\s*({.*?});', response.text, re.DOTALL)
+        # ── Strategy A: js-store div (preferred) ─────────────────────────────
+        try:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            store_div = soup.find('div', class_='js-store')
+            if store_div and store_div.get('data-content'):
+                data = json.loads(unquote(store_div['data-content']))
+                content = data['store']['page']['data']['tab_view']['wiki_tab']['content']
+                print(f"[CHORDS] ✓ Strategy A: extracted {len(content)} chars from js-store div")
+                return content
+        except Exception as e:
+            print(f"[CHORDS] Strategy A failed: {e}")
 
-        if not match:
-            print("[CHORDS] ✗ Could not find chord content in page")
-            return None
+        # ── Strategy B: window.UGAPP JSON blob with proper boundary finder ───
+        try:
+            marker = 'window.UGAPP.store.page = '
+            idx = response.text.find(marker)
+            if idx != -1:
+                start = response.text.index('{', idx)
+                decoder = json.JSONDecoder()
+                data, _ = decoder.raw_decode(response.text[start:])
+                content = data['data']['tab_view']['wiki_tab']['content']
+                print(f"[CHORDS] ✓ Strategy B: extracted {len(content)} chars from UGAPP blob")
+                return content
+        except Exception as e:
+            print(f"[CHORDS] Strategy B failed: {e}")
 
-        import json
-        data = json.loads(match.group(1))
-
-        # Extract tab content
-        if 'data' in data and 'tab_view' in data['data'] and 'wiki_tab' in data['data']['tab_view']:
-            content = data['data']['tab_view']['wiki_tab']['content']
-            print(f"[CHORDS] ✓ Successfully extracted {len(content)} characters of chord content")
-            return content
-        else:
-            print("[CHORDS] ✗ Content not found in expected data structure")
-
+        print("[CHORDS] ✗ Could not extract chord content from page")
         return None
 
     except Exception as e:

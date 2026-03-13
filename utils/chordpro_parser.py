@@ -29,19 +29,42 @@ def parse_chordpro(file_path: str) -> Dict:
     lines = content.split('\n')
     in_verse = False
     in_chorus = False
+    in_tab = False
 
-    for line in lines:
-        line = line.strip()
+    for original_line in lines:
+        line = original_line.strip()
 
         # Skip empty lines at the start
         if not line and not html_lines:
+            continue
+
+        # Inside a tab block: emit raw lines (whitespace preserved)
+        if in_tab:
+            if line.startswith('{') and 'end_of_tab' in line.lower():
+                html_lines.append('</pre></div>')
+                in_tab = False
+            else:
+                html_lines.append(original_line.rstrip())
             continue
 
         # Handle directives
         if line.startswith('{'):
             directive_lower = line.lower()
 
-            if 'start_of_verse' in directive_lower or 'sov' in directive_lower:
+            if 'start_of_tab' in directive_lower:
+                label_match = re.search(r'\{start_of_tab:?\s*(.+?)\}', line, re.IGNORECASE)
+                label = label_match.group(1).strip() if label_match else 'Tab'
+                html_lines.append(
+                    f'<div class="tab-section"><div class="tab-label">{label}</div>'
+                    '<pre class="tab-pre">'
+                )
+                in_tab = True
+                continue
+            elif 'end_of_tab' in directive_lower:
+                html_lines.append('</pre></div>')
+                in_tab = False
+                continue
+            elif 'start_of_verse' in directive_lower or 'sov' in directive_lower:
                 html_lines.append('<div class="verse my-6">')
                 in_verse = True
                 continue
@@ -76,6 +99,8 @@ def parse_chordpro(file_path: str) -> Dict:
         html_lines.append(html_line)
 
     # Close any open sections
+    if in_tab:
+        html_lines.append('</pre></div>')
     if in_verse:
         html_lines.append('</div>')
     if in_chorus:
@@ -89,46 +114,78 @@ def parse_chordpro(file_path: str) -> Dict:
     }
 
 
+# Valid chord name: must start with a note letter (A-G) + optional modifiers
+_CHORD_NAME_RE = re.compile(
+    r'^[A-G][#b]?(?:m(?:aj)?|min|dim|aug|sus|add)?(?:\d+)?(?:/[A-G][#b]?)?$'
+)
+
+
 def parse_chord_line(line: str) -> str:
     """
     Parse a single line with chords in [brackets] and return HTML.
 
-    Chords in brackets are displayed above the lyrics.
-    Example: "When I [C]find myself in [G]times of trouble"
+    Each chord is paired with the text that FOLLOWS it, so the chord
+    name sits directly above the syllable where it is played.
+    Text before the first chord gets an empty chord-slot for alignment.
+    Bracket content that doesn't look like a chord (e.g. [Instrumental])
+    is treated as plain text.
 
-    Returns HTML with chords positioned above lyrics using spans.
+    Example: "When I [C]find myself in [G]times of trouble"
+      → empty | "When I "
+      → C     | "find myself in "
+      → G     | "times of trouble"
     """
     if '[' not in line:
-        # No chords, just lyrics
         return f'<div class="lyric-line text-2xl my-1 leading-relaxed">{line}</div>'
 
-    # Split into chord and lyric segments
-    result_html = '<div class="chord-line my-2 leading-loose">'
-
-    # Find all chord positions
     chord_pattern = re.compile(r'\[([^\]]+)\]')
-    last_end = 0
+    all_matches = list(chord_pattern.finditer(line))
 
-    for match in chord_pattern.finditer(line):
-        chord = match.group(1)
-        start = match.start()
-        end = match.end()
+    # If no bracket contains a valid chord name, treat the whole line as a lyric
+    if not any(_CHORD_NAME_RE.match(m.group(1)) for m in all_matches):
+        # Strip any remaining brackets and emit as a plain lyric line
+        plain = chord_pattern.sub(r'\1', line)
+        return f'<div class="lyric-line text-2xl my-1 leading-relaxed">{plain}</div>'
 
-        # Add any text before this chord
-        before_text = line[last_end:start]
+    result_html = '<div class="chord-line my-2">'
 
-        # Create a span for chord + lyric segment
-        result_html += f'<span class="chord-segment inline-block relative">'
-        result_html += f'<span class="chord absolute -top-7 left-0 text-blue-600 font-bold text-xl whitespace-nowrap">{chord}</span>'
-        result_html += f'<span class="lyric text-2xl">{before_text}</span>'
-        result_html += '</span>'
+    pos = 0
+    # Only iterate over valid-chord matches; invalid brackets become inline text
+    valid_matches = [m for m in all_matches if _CHORD_NAME_RE.match(m.group(1))]
 
-        last_end = end
+    for i, match in enumerate(valid_matches):
+        chord_name = match.group(1)
+        chord_end = match.end()
 
-    # Add any remaining text after the last chord
-    remaining = line[last_end:]
-    if remaining:
-        result_html += f'<span class="text-2xl">{remaining}</span>'
+        # Text before this chord (may include invalid [bracket] content)
+        before = line[pos:match.start()]
+        # Strip brackets from any non-chord bracket in 'before'
+        before = chord_pattern.sub(lambda m: m.group(1) if not _CHORD_NAME_RE.match(m.group(1)) else m.group(0), before)
+        if before:
+            result_html += (
+                '<span class="chord-segment">'
+                '<span class="chord"></span>'
+                f'<span class="lyric text-2xl">{before}</span>'
+                '</span>'
+            )
+
+        # Text following this chord up to the next valid chord
+        next_start = valid_matches[i + 1].start() if i + 1 < len(valid_matches) else len(line)
+        after = line[chord_end:next_start]
+        # Strip brackets from invalid [bracket] content in 'after'
+        after = chord_pattern.sub(lambda m: m.group(1) if not _CHORD_NAME_RE.match(m.group(1)) else m.group(0), after)
+
+        # Trailing chord with no lyric text looks like a subscript — give it a nbsp
+        display_after = after if after.strip() else ('\u00a0' if not after else after)
+
+        result_html += (
+            '<span class="chord-segment">'
+            f'<span class="chord text-blue-600 font-bold whitespace-nowrap">{chord_name}</span>'
+            f'<span class="lyric text-2xl">{display_after}</span>'
+            '</span>'
+        )
+
+        pos = next_start
 
     result_html += '</div>'
     return result_html

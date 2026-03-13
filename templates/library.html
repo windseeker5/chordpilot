@@ -398,6 +398,11 @@ function openRowMenu(songId, title, triggerEl) {
         '   onmouseover="this.style.background=\'oklch(var(--b2))\'" onmouseout="this.style.background=\'transparent\'">' +
         '  <i data-lucide="play" style="width:14px;height:14px;color:#3b82f6;flex-shrink:0;"></i> Practice' +
         '</a>' +
+        '<a href="/song/' + songId + '/edit" ' +
+        '   style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;font-size:0.875rem;text-decoration:none;color:oklch(var(--bc));transition:background 0.1s;" ' +
+        '   onmouseover="this.style.background=\'oklch(var(--b2))\'" onmouseout="this.style.background=\'transparent\'">' +
+        '  <i data-lucide="edit-3" style="width:14px;height:14px;color:#8b5cf6;flex-shrink:0;"></i> Edit Chords' +
+        '</a>' +
         '<div style="height:1px;background:oklch(var(--b3));margin:3px 0;"></div>' +
         '<button onclick="deleteSong(\'' + songId + '\', \'' + safeTitle + '\'); document.getElementById(\'row-action-menu\')?.remove();" ' +
         '        style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;font-size:0.875rem;color:oklch(var(--er));background:none;border:none;cursor:pointer;width:100%;text-align:left;transition:background 0.1s;" ' +

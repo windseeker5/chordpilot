@@ -14,6 +14,37 @@ Handles common formats like:
 import re
 from typing import List, Tuple
 
+# Lines that are clearly not musical content (UG page garbage)
+_GARBAGE_RE = re.compile(
+    r'^(difficulty|tuning|author|tab\s+by|tabbed\s+by|transcribed\s+by|rate|print|'
+    r'speed\s*:|transpose$|report\s+bad\s+tab|views?\s*:|key\s*:|saves?\s*:|'
+    r'comments?\s*:|\*+\s*$)',
+    re.IGNORECASE
+)
+
+# All-caps no-space blobs like "BFEB" — transposition indicators, navigation cruft
+_ALLCAPS_BLOB_RE = re.compile(r'^[A-G#b]{2,10}$')
+
+def _is_garbage_line(line: str) -> bool:
+    s = line.strip()
+    if not s:
+        return False
+    if _GARBAGE_RE.match(s):
+        return True
+    if 'ultimate-guitar.com' in s.lower():
+        return True
+    # "Yellow Chords by Coldplay" / "Song Name Tab by Artist" — UG page title
+    if re.search(r'\b(chords|tabs?)\s+by\b', s, re.IGNORECASE):
+        return True
+    # "14,502,757 views566,330 saves292 comments" — view/save stats
+    # (no \b needed — "views" glued to digits still counts as a stat line)
+    if re.search(r'\d[\d,]*\s*views', s, re.IGNORECASE):
+        return True
+    # All-caps no-space blob like "BFEB" (transposition strip) — not a lyric
+    if _ALLCAPS_BLOB_RE.match(s):
+        return True
+    return False
+
 
 def is_chord_line(line: str) -> bool:
     """
@@ -32,6 +63,13 @@ def is_chord_line(line: str) -> bool:
         True if the line appears to be a chord line
     """
     if not line.strip():
+        return False
+
+    # Already ChordPro inline format [Chord]lyrics — not a raw chord line
+    _cp_bracket = re.compile(
+        r'\[[A-G][#b]?(?:m|maj|min|dim|aug|sus)?(?:2|4|5|6|7|9|11|13)?(?:/[A-G][#b]?)?\]'
+    )
+    if _cp_bracket.search(line):
         return False
 
     # Chord pattern: C, Am, F#m, Gsus4, Cmaj7, D/F#, etc.
@@ -112,6 +150,22 @@ def merge_chords_and_lyrics(chord_line: str, lyric_line: str) -> str:
     return ''.join(result).strip()
 
 
+def strip_ug_markup(text: str) -> str:
+    """Pre-process Ultimate Guitar wiki_tab content to remove UG-specific tags."""
+    # Convert UG section tags to plain markers the converter can handle
+    text = re.sub(r'\[verse\s*\d*\]', '[Verse]', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[chorus\]', '[Chorus]', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[bridge\]', '[Bridge]', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[intro\]', '[Intro]', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[outro\]', '[Outro]', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[pre.?chorus\]', '[Pre-Chorus]', text, flags=re.IGNORECASE)
+    # Convert [ch]X[/ch] → [X] (ChordPro bracket format — keeps chords inline)
+    text = re.sub(r'\[ch\](.*?)\[/ch\]', r'[\1]', text)
+    # Strip [tab] / [/tab] wrappers
+    text = re.sub(r'\[/?tab\]', '', text)
+    return text
+
+
 def detect_section_marker(line: str) -> Tuple[str, str]:
     """
     Detect section markers like [Verse 1], [Chorus], etc.
@@ -126,8 +180,9 @@ def detect_section_marker(line: str) -> Tuple[str, str]:
             "[Chorus]" → ("chorus", "Chorus")
             "[Bridge]" → ("bridge", "Bridge")
     """
-    # Match patterns like [Verse 1], [Chorus], [Bridge], etc.
-    match = re.match(r'\[([^\]]+)\]', line.strip())
+    # Match lines that are ONLY a section label like [Verse 1] or [Chorus]
+    # fullmatch ensures [Am]lyrics lines are NOT treated as section markers
+    match = re.fullmatch(r'\[([^\]]+)\]', line.strip())
     if not match:
         return None, None
 
@@ -147,9 +202,11 @@ def detect_section_marker(line: str) -> Tuple[str, str]:
         return 'outro', content
     elif 'pre-chorus' in content_lower or 'prechorus' in content_lower:
         return 'prechorus', content
+    elif 'solo' in content_lower:
+        return 'verse', content  # treat solo as a verse block
     else:
-        # Generic section
-        return 'verse', content
+        # Unknown label — don't assume it's a section (could be a chord abbreviation)
+        return None, None
 
 
 def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', key: str = '') -> str:
@@ -183,7 +240,8 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
     if not raw_text or not raw_text.strip():
         return ""
 
-    lines = raw_text.split('\n')
+    raw_text = strip_ug_markup(raw_text)
+    lines = [l for l in raw_text.split('\n') if not _is_garbage_line(l)]
     chordpro_lines = []
 
     # Add metadata headers
@@ -205,7 +263,7 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
     while i < len(lines):
         line = lines[i]
 
-        # Check for section markers
+        # Check for section markers like [Verse], [Chorus], [Bridge]…
         section_type, section_label = detect_section_marker(line)
         if section_type:
             # Close previous section if open
@@ -216,6 +274,11 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
             # Start new section
             in_section = section_type
             chordpro_lines.append(f'{{start_of_{section_type}}}')
+            i += 1
+            continue
+
+        # Unknown [Label] line (e.g. [Instrumental], [Solo]) — skip it
+        if re.fullmatch(r'\[[^\]]+\]', line.strip()):
             i += 1
             continue
 

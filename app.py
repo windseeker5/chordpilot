@@ -5,6 +5,7 @@ Now with library management and automatic song fetching from YouTube!
 Multi-source chord fetching: Songsterr → Ultimate Guitar → Ollama AI → Manual
 """
 import os
+import re
 import json
 import subprocess
 import threading
@@ -484,6 +485,79 @@ def song_player(song_id):
     )
 
 
+@app.route('/song/<song_id>/edit', methods=['GET', 'POST'])
+@login_required
+def song_editor(song_id):
+    """Chord editor — split-pane editor with live preview"""
+    song = get_song_by_id(song_id)
+    if not song:
+        if request.method == 'POST':
+            return jsonify({'error': 'Song not found'}), 404
+        return "Song not found", 404
+
+    if request.method == 'POST':
+        data = request.get_json()
+        content = (data.get('content') or '').strip()
+        if not content:
+            return jsonify({'error': 'No content to save'}), 400
+
+        # Auto-convert raw UG tab format → ChordPro if no directives
+        if not re.search(r'\{(title|artist|start_of|end_of|key)\s*:', content, re.IGNORECASE):
+            from utils.chord_converter import convert_raw_to_chordpro
+            content = convert_raw_to_chordpro(
+                content,
+                song['title'],
+                song.get('artist', ''),
+                song.get('key', '')
+            )
+
+        chordpro_path = os.path.join(SONGS_DIR, song['folder'], 'chords.cho')
+        os.makedirs(os.path.dirname(chordpro_path), exist_ok=True)
+        with open(chordpro_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        return jsonify({'success': True, 'message': 'Chords saved!'})
+
+    # GET — read existing content
+    chordpro_path = os.path.join(SONGS_DIR, song['folder'], 'chords.cho')
+    content = ''
+    if os.path.exists(chordpro_path):
+        with open(chordpro_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+    return render_template('song_editor.html', song=song, content=content)
+
+
+@app.route('/api/preview-chords', methods=['POST'])
+def api_preview_chords():
+    """Convert raw/ChordPro text to rendered HTML for the editor preview pane"""
+    import tempfile
+    data = request.get_json()
+    content = (data.get('content') or '').strip()
+
+    if not content:
+        return jsonify({'html': ''})
+
+    # Auto-convert raw UG tab format → ChordPro if no directives present
+    if not re.search(r'\{(title|artist|start_of|end_of|key)\s*:', content, re.IGNORECASE):
+        from utils.chord_converter import convert_raw_to_chordpro
+        content = convert_raw_to_chordpro(content)
+
+    # Write to a temp file and parse (reuses existing parse_chordpro)
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.cho', delete=False, encoding='utf-8') as f:
+            f.write(content)
+            tmp_path = f.name
+        parsed = parse_chordpro(tmp_path)
+        return jsonify({'html': parsed['html']})
+    except Exception as e:
+        return jsonify({'html': f'<p style="color:red">Parse error: {e}</p>'})
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
 @app.route('/api/songs')
 def api_songs():
     """API endpoint to get all songs as JSON"""
@@ -705,6 +779,28 @@ def api_notifications():
     return jsonify({'unread': unread, 'notifications': notifications})
 
 
+@app.route('/api/fetch-tab-url', methods=['POST'])
+@login_required
+def api_fetch_tab_url():
+    """Fetch and convert chords from an Ultimate Guitar URL into ChordPro."""
+    data = request.get_json() or {}
+    url = data.get('url', '').strip()
+    if not url or 'ultimate-guitar.com' not in url:
+        return jsonify({'error': 'Please provide a valid Ultimate Guitar URL'}), 400
+
+    song_id = data.get('song_id')
+    song = db.get_song_by_id(song_id) if song_id else None
+
+    raw = fetch_chords_from_url(url)
+    if not raw:
+        return jsonify({'error': 'Could not fetch chords from that URL. Try copying the tab text manually.'}), 422
+
+    title = song['title'] if song else 'Unknown'
+    artist = song['artist'] if song else 'Unknown'
+    chordpro = convert_to_chordpro(raw, title, artist)
+    return jsonify({'chordpro': chordpro})
+
+
 @app.route('/api/notifications/read', methods=['POST'])
 def api_mark_notifications_read():
     user_id = session.get('user_id')
@@ -735,4 +831,4 @@ def inject_user():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5005, debug=True)

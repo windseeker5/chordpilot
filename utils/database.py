@@ -16,8 +16,9 @@ DB_PATH = 'guitprac.db'
 
 def get_db():
     """Get database connection"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+    conn.execute('PRAGMA journal_mode=WAL')  # Allow concurrent reads + one writer
     return conn
 
 

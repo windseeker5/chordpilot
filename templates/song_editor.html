@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Chords — {{ song.title }}{% endblock %}
+{% block page_title %}Edit Chords{% endblock %}
+
+{% block extra_styles %}
+<style>
+#editor-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    height: calc(100vh - 210px);
+    min-height: 480px;
+}
+@media (max-width: 768px) {
+    #editor-wrap { grid-template-columns: 1fr; height: auto; }
+    #chord-editor { height: 320px; }
+    #preview-pane  { height: 320px; }
+}
+#chord-editor {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    font-family: 'Fira Mono', 'Courier New', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    padding: 12px;
+    border: 1px solid oklch(var(--b3));
+    border-radius: 8px;
+    background: oklch(var(--b1));
+    color: oklch(var(--bc));
+    outline: none;
+    box-sizing: border-box;
+    tab-size: 4;
+}
+#chord-editor:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+}
+#preview-pane {
+    height: 100%;
+    overflow-y: auto;
+    background: oklch(var(--b2));
+    border: 1px solid oklch(var(--b3));
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    box-sizing: border-box;
+}
+.editor-col-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: oklch(var(--bc)/0.4);
+    margin-bottom: 6px;
+}
+/* ChordPro rendering in preview (same as player) */
+.preview-chord-line { position: relative; min-height: 2.4rem; }
+.preview-chord-segment { margin-right: 0.2rem; }
+.verse  { margin-bottom: 1.5rem; }
+.chorus { margin-bottom: 1.5rem; padding-left: 1rem; border-left: 3px solid oklch(var(--p)); }
+
+/* Help section */
+details.help-section {
+    margin-top: 1rem;
+    border: 1px solid oklch(var(--b3));
+    border-radius: 8px;
+    overflow: hidden;
+}
+details.help-section summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background: oklch(var(--b2));
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+details.help-section summary::-webkit-details-marker { display: none; }
+details.help-section[open] summary { border-bottom: 1px solid oklch(var(--b3)); }
+.help-body { padding: 14px; font-size: 0.8125rem; }
+.help-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 640px) { .help-row { grid-template-columns: 1fr; } }
+code.example {
+    display: block;
+    background: oklch(var(--b2));
+    border: 1px solid oklch(var(--b3));
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    margin-top: 6px;
+    cursor: pointer;
+}
+code.example:hover { background: oklch(var(--b3)); }
+
+/* Save feedback */
+#save-status {
+    font-size: 0.8125rem;
+    transition: opacity 0.3s;
+}
+</style>
+{% endblock %}
+
+{% block nav_buttons %}
+<a href="/song/{{ song.song_id }}" class="cp-btn cp-btn-ghost cp-btn-sm gap-1">
+    <i data-lucide="play" class="w-3.5 h-3.5"></i>
+    View Song
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:none;">
+
+    <!-- ── Top bar: song info + save controls ── -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h2 style="font-size:1.25rem;font-weight:700;margin:0 0 2px;">{{ song.title }}</h2>
+            <p style="font-size:0.875rem;color:oklch(var(--bc)/0.5);margin:0;">{{ song.artist or '—' }}</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span id="format-badge" class="badge badge-ghost badge-sm">Detecting…</span>
+            <span id="save-status" style="color:oklch(var(--su));opacity:0;"></span>
+            <button onclick="saveChords()" id="save-btn" class="cp-btn cp-btn-primary gap-1">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                Save
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Fetch from URL panel ── -->
+    <details id="fetch-url-details" style="margin-bottom:0.75rem;border:1px solid oklch(var(--b3));border-radius:8px;overflow:hidden;">
+        <summary style="padding:8px 14px;cursor:pointer;font-size:0.8125rem;font-weight:500;background:oklch(var(--b2));display:flex;align-items:center;gap:6px;list-style:none;user-select:none;">
+            <i data-lucide="link" style="width:13px;height:13px;opacity:0.6;flex-shrink:0;"></i>
+            Fetch chords from Ultimate Guitar URL
+            <i data-lucide="chevron-down" style="width:12px;height:12px;opacity:0.4;margin-left:auto;" id="fetch-chevron"></i>
+        </summary>
+        <div style="padding:12px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="fetch-url-input" type="url"
+                   placeholder="https://tabs.ultimate-guitar.com/tab/artist/song-chords-12345"
+                   style="flex:1;min-width:240px;font-size:0.8125rem;padding:6px 10px;border:1px solid oklch(var(--b3));border-radius:6px;background:oklch(var(--b1));color:oklch(var(--bc));outline:none;" />
+            <button onclick="fetchFromUrl()" class="cp-btn cp-btn-secondary cp-btn-sm gap-1">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                Fetch
+            </button>
+            <span id="fetch-status" style="font-size:0.8rem;opacity:0.7;"></span>
+        </div>
+    </details>
+
+    <!-- ── Split pane ── -->
+    <div id="editor-wrap">
+
+        <!-- LEFT: editor -->
+        <div style="display:flex;flex-direction:column;">
+            <div class="editor-col-label">ChordPro / Tab Input</div>
+            <textarea id="chord-editor" spellcheck="false"
+                      placeholder="{title: My Song}&#10;{artist: Artist Name}&#10;{key: G}&#10;&#10;{start_of_verse}&#10;[G]Here are some [Em]chords&#10;[C]and lyrics [D]below&#10;{end_of_verse}">{{ content | e }}</textarea>
+        </div>
+
+        <!-- RIGHT: preview -->
+        <div style="display:flex;flex-direction:column;">
+            <div class="editor-col-label">Live Preview</div>
+            <div id="preview-pane">
+                <div id="preview-content" style="font-size:1rem;">
+                    <p style="color:oklch(var(--bc)/0.4);font-size:0.875rem;">Preview will appear here as you type…</p>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /editor-wrap -->
+
+
+    <!-- ── ChordPro help section ── -->
+    <details class="help-section">
+        <summary>
+            <i data-lucide="book-open" style="width:14px;height:14px;opacity:0.6;flex-shrink:0;"></i>
+            ChordPro Syntax Guide
+            <i data-lucide="chevron-down" style="width:12px;height:12px;opacity:0.4;margin-left:auto;" id="help-chevron"></i>
+        </summary>
+        <div class="help-body">
+            <div class="help-row">
+                <div>
+                    <div style="font-weight:600;margin-bottom:8px;">Format 1 — ChordPro (recommended)</div>
+                    <p style="color:oklch(var(--bc)/0.6);margin:0 0 6px;">Put chords in <code>[brackets]</code> inline before the syllable they land on.</p>
+                    <code class="example" onclick="insertExample(this.textContent)">{title: Wish You Were Here}
+{artist: Pink Floyd}
+{key: G}
+
+{start_of_verse}
+So, so you [G]think you can [Em]tell,
+[G]heaven from [Em]hell?
+{end_of_verse}
+
+{start_of_chorus}
+[C]How I [G]wish you were [D]here
+{end_of_chorus}</code>
+                </div>
+                <div>
+                    <div style="font-weight:600;margin-bottom:8px;">Format 2 — Tab/UG style (auto-converts)</div>
+                    <p style="color:oklch(var(--bc)/0.6);margin:0 0 6px;">Chord names on a separate line above the lyrics, aligned by position.</p>
+                    <code class="example" onclick="insertExample(this.textContent)">[Verse 1]
+     C              G
+Look at the stars
+     Am             F
+Look how they shine for you
+
+[Chorus]
+     C              G
+And it was all yellow</code>
+                </div>
+            </div>
+
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid oklch(var(--b3));">
+                <div style="font-weight:600;margin-bottom:8px;">Common directives</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:0.8125rem;">
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{title: Song Title}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{artist: Artist Name}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{key: G}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{tempo: 120}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{start_of_verse}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{end_of_verse}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{start_of_chorus}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{end_of_chorus}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{comment: A note here}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{start_of_tab: Intro}</code>
+                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{end_of_tab}</code>
+                </div>
+                <p style="margin-top:8px;color:oklch(var(--bc)/0.5);font-size:0.75rem;">
+                    Tip: Click either code block above to paste it into the editor.
+                    Tab blocks use <code style="font-size:0.75rem;">{start_of_tab: Label}</code> … <code style="font-size:0.75rem;">{end_of_tab}</code> — paste standard ASCII tab (<code style="font-size:0.75rem;">e|---|</code> format) inside. Whitespace is preserved automatically.
+                </p>
+            </div>
+        </div>
+    </details>
+
+</div><!-- /max-w-none -->
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+lucide.createIcons();
+
+var songId = {{ song.song_id | tojson }};
+var editor = document.getElementById('chord-editor');
+var previewContent = document.getElementById('preview-content');
+var formatBadge = document.getElementById('format-badge');
+var saveStatus = document.getElementById('save-status');
+var previewTimer = null;
+var saveStatusTimer = null;
+
+// ── Format detection ──────────────────────────────
+function detectFormat(text) {
+    if (!text.trim()) return 'empty';
+    if (/\{(title|artist|start_of|end_of|key)\s*:/i.test(text)) return 'chordpro';
+    // Raw UG: a line that's mostly uppercase letters/spaces (chord names)
+    // followed by a lyric line
+    if (/^[A-G][#b]?(m|maj|min|dim|sus|aug)?(2|4|7|9)?\s{2,}/m.test(text)) return 'tab';
+    // Has inline chord brackets but no directives
+    if (/\[[A-G][#b]?(m|maj|min)?(2|4|7|9)?\]/.test(text)) return 'chordpro';
+    return 'plain';
+}
+
+function updateFormatBadge(fmt) {
+    formatBadge.className = 'badge badge-sm';
+    if (fmt === 'chordpro') {
+        formatBadge.textContent = 'ChordPro';
+        formatBadge.classList.add('badge-primary');
+    } else if (fmt === 'tab') {
+        formatBadge.textContent = 'Tab → auto-convert';
+        formatBadge.classList.add('badge-secondary');
+    } else if (fmt === 'plain') {
+        formatBadge.textContent = 'Plain text';
+        formatBadge.classList.add('badge-ghost');
+    } else {
+        formatBadge.textContent = 'Empty';
+        formatBadge.classList.add('badge-ghost');
+    }
+}
+
+// ── Live preview ──────────────────────────────────
+async function updatePreview() {
+    var content = editor.value;
+    var fmt = detectFormat(content);
+    updateFormatBadge(fmt);
+
+    if (!content.trim()) {
+        previewContent.innerHTML = '<p style="color:oklch(var(--bc)/0.4);font-size:0.875rem;">Start typing to see a preview…</p>';
+        return;
+    }
+
+    try {
+        var res = await fetch('/api/preview-chords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content })
+        });
+        var data = await res.json();
+        if (data.html) {
+            previewContent.innerHTML = data.html;
+        } else if (data.error) {
+            previewContent.innerHTML = '<p style="color:oklch(var(--er));font-size:0.875rem;">Error: ' + data.error + '</p>';
+        }
+    } catch(e) {
+        previewContent.innerHTML = '<p style="color:oklch(var(--er)/0.7);font-size:0.875rem;">Preview unavailable</p>';
+    }
+}
+
+editor.addEventListener('input', function() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(updatePreview, 400);
+});
+
+// ── Save ──────────────────────────────────────────
+async function saveChords() {
+    var content = editor.value.trim();
+    if (!content) { alert('Nothing to save.'); return; }
+
+    var btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+        var res = await fetch('/song/' + songId + '/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content })
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            saveStatus.textContent = '✓ Saved';
+            saveStatus.style.color = '#22c55e';
+            saveStatus.style.opacity = '1';
+            clearTimeout(saveStatusTimer);
+            saveStatusTimer = setTimeout(function() {
+                saveStatus.style.opacity = '0';
+            }, 2500);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch(e) {
+        alert('Failed to save. Check the server.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" style="width:14px;height:14px;"></i> Save';
+        lucide.createIcons();
+    }
+}
+
+// ── Help examples: click to insert ───────────────
+function insertExample(text) {
+    editor.value = text.trim();
+    editor.focus();
+    updatePreview();
+}
+
+// ── Fetch from URL ────────────────────────────────
+async function fetchFromUrl() {
+    var url = document.getElementById('fetch-url-input').value.trim();
+    var status = document.getElementById('fetch-status');
+    if (!url) return;
+    status.textContent = 'Fetching…';
+    try {
+        var res = await fetch('/api/fetch-tab-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url, song_id: {{ song.song_id | tojson }} })
+        });
+        var data = await res.json();
+        if (data.chordpro) {
+            editor.value = data.chordpro;
+            editor.dispatchEvent(new Event('input'));
+            status.textContent = '✓ Loaded';
+            document.getElementById('fetch-url-details').removeAttribute('open');
+        } else {
+            status.textContent = data.error || 'Failed to fetch';
+        }
+    } catch(e) {
+        status.textContent = 'Network error';
+    }
+}
+
+document.getElementById('fetch-url-details').addEventListener('toggle', function() {
+    var icon = document.getElementById('fetch-chevron');
+    icon.setAttribute('data-lucide', this.open ? 'chevron-up' : 'chevron-down');
+    lucide.createIcons();
+});
+
+// ── Help chevron toggle ───────────────────────────
+document.querySelector('details.help-section').addEventListener('toggle', function(e) {
+    var icon = document.getElementById('help-chevron');
+    icon.setAttribute('data-lucide', this.open ? 'chevron-up' : 'chevron-down');
+    lucide.createIcons();
+});
+
+// ── Keyboard shortcut: Ctrl/Cmd+S ────────────────
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveChords();
+    }
+});
+
+// Initial render
+updatePreview();
+</script>
+{% endblock %}
