@@ -20,7 +20,11 @@
 
         .sidebar {
             width: 220px;
-            min-height: 100vh;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            align-self: flex-start;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             background: var(--sidebar-bg, #ffffff);
@@ -66,8 +70,9 @@
             position: sticky;
             top: 0;
             z-index: 40;
+            border-bottom: 1px solid var(--topbar-border, #f1f5f9);
         }
-        [data-theme="dark"] .topbar { background: oklch(var(--b1)); }
+        [data-theme="dark"] .topbar { background: oklch(var(--b1)); border-bottom-color: oklch(var(--b3)); }
 
         /* ── Logo area ── */
         .sidebar-logo {

@@ -67,6 +67,81 @@
 [data-theme="light"] .page-main {
     background: #f8fafc !important;
 }
+/* Fix sticky positioning: page-main's overflow-y:auto breaks position:sticky.
+   Override to visible so sticky elements anchor to the window scroll instead. */
+.page-main {
+    overflow-y: visible !important;
+}
+
+/* Sticky player card zone — sits below topbar (48px) */
+.player-sticky {
+    position: sticky;
+    top: 48px;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+    padding: 8px 1.25rem;
+    margin-bottom: 16px;
+}
+@media (min-width: 1024px) {
+    .player-sticky { margin-left: -1.5rem; margin-right: -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+[data-theme="dark"] .player-sticky {
+    background: oklch(var(--b1) / 0.92);
+    border-bottom-color: oklch(var(--b3));
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+/* Strip the card chrome — it's inside the sticky zone now */
+.player-sticky .player-card,
+[data-theme="light"] .player-sticky .player-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.player-sticky .card-body { padding: 0; }
+
+/* Sticky chord diagrams zone — top set dynamically by JS */
+.chords-sticky {
+    position: sticky;
+    z-index: 29;
+    background: rgba(248, 250, 252, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+    padding: 8px 1.25rem;
+    margin-bottom: 16px;
+}
+@media (min-width: 1024px) {
+    .chords-sticky { margin-left: -1.5rem; margin-right: -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+[data-theme="dark"] .chords-sticky {
+    background: oklch(var(--b2) / 0.95);
+    border-bottom-color: oklch(var(--b3));
+}
+
+/* Fade mask on right edge of chord strip */
+.chord-strip-wrapper {
+    position: relative;
+}
+.chord-strip-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 8px;
+    width: 32px;
+    background: linear-gradient(to right, transparent, rgba(248,250,252,0.95));
+    pointer-events: none;
+}
+[data-theme="dark"] .chord-strip-wrapper::after {
+    background: linear-gradient(to right, transparent, oklch(var(--b2)));
+}
 </style>
 {% endblock %}
 
@@ -84,68 +159,79 @@
 {% block content %}
 <div class="max-w-4xl mx-auto">
 
-    <!-- Song Info -->
-    <div class="mb-6 text-center">
-        <h1 class="text-3xl font-bold mb-1">{{ parsed.title }}</h1>
-        <p class="text-base-content/60 text-lg mb-2">{{ parsed.artist }}</p>
-        {% if parsed.key %}
-        <span class="badge badge-secondary">Key of {{ parsed.key }}</span>
-        {% endif %}
-    </div>
-
-    <!-- Audio Player -->
-    <div class="card player-card mb-6">
-        <div class="card-body py-4 px-5">
-            {% if audio_url %}
-            <!-- Hidden native audio element -->
-            <audio id="audio-player" preload="auto">
-                <source src="{{ audio_url }}" type="audio/mpeg">
-            </audio>
-
-            <!-- Progress bar -->
-            <div class="flex items-center gap-3 mb-3">
-                <span id="current-time" class="text-sm font-mono w-10 shrink-0">0:00</span>
-                <input type="range" id="seek-bar" class="range range-primary range-xs flex-1"
-                       min="0" max="100" value="0" step="0.1" />
-                <span id="duration" class="text-sm font-mono w-10 shrink-0 text-right">0:00</span>
-            </div>
-
-            <!-- Controls -->
-            <div class="flex items-center justify-between flex-wrap gap-3">
-                <div class="flex gap-2">
-                    <button id="restart-btn" class="cp-btn cp-btn-ghost cp-btn-circle cp-btn-sm" title="Restart">
-                        <i data-lucide="skip-back" class="w-4 h-4"></i>
-                    </button>
-                    <button id="play-btn" class="cp-btn cp-btn-primary cp-btn-circle">
-                        <i data-lucide="play" class="w-5 h-5"></i>
-                    </button>
-                    <button id="pause-btn" class="cp-btn cp-btn-secondary cp-btn-circle hidden">
-                        <i data-lucide="pause" class="w-5 h-5"></i>
-                    </button>
-                </div>
-
-                <!-- Auto-scroll toggle -->
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <span class="text-sm font-medium">Auto-scroll</span>
-                    <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-sm" checked />
-                </label>
-            </div>
-            {% else %}
-            <div class="alert alert-warning text-sm">
-                <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
-                <div>
-                    <p class="font-bold">Audio not available</p>
-                    <p>No audio file for this song. You can still view the chords below.</p>
-                </div>
-            </div>
+    <!-- STICKY PLAYER ZONE -->
+    <div class="player-sticky">
+        <!-- Song Info — pinned inside sticky zone -->
+        <div class="text-center mb-3">
+            <h1 class="text-2xl font-bold mb-0.5">{{ parsed.title }}</h1>
+            <p class="text-base-content/60 mb-1">{{ parsed.artist }}</p>
+            {% if parsed.key %}
+            <span class="badge badge-secondary">Key of {{ parsed.key }}</span>
             {% endif %}
+        </div>
+        <div class="card player-card">
+            <div class="card-body py-4 px-5">
+                {% if audio_url %}
+                <!-- Hidden native audio element -->
+                <audio id="audio-player" preload="auto">
+                    <source src="{{ audio_url }}" type="audio/mpeg">
+                </audio>
+
+                <!-- Progress bar -->
+                <div class="flex items-center gap-3 mb-3">
+                    <span id="current-time" class="text-sm font-mono w-10 shrink-0">0:00</span>
+                    <input type="range" id="seek-bar" class="range range-primary range-xs flex-1"
+                           min="0" max="100" value="0" step="0.1" />
+                    <span id="duration" class="text-sm font-mono w-10 shrink-0 text-right">0:00</span>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div class="flex gap-2">
+                        <button id="restart-btn" class="cp-btn cp-btn-ghost cp-btn-circle cp-btn-sm" title="Restart">
+                            <i data-lucide="skip-back" class="w-4 h-4"></i>
+                        </button>
+                        <button id="play-btn" class="cp-btn cp-btn-primary cp-btn-circle">
+                            <i data-lucide="play" class="w-5 h-5"></i>
+                        </button>
+                        <button id="pause-btn" class="cp-btn cp-btn-secondary cp-btn-circle hidden">
+                            <i data-lucide="pause" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Auto-scroll toggle + speed slider -->
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <span class="text-sm font-medium">Auto-scroll</span>
+                            <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-sm" checked />
+                        </label>
+                        <div id="speed-control" class="flex items-center gap-1.5">
+                            <span class="text-xs text-base-content/40">slow</span>
+                            <input type="range" id="scroll-speed" min="1" max="10" value="5" step="1"
+                                   class="range range-primary range-xs w-20" title="Scroll speed" />
+                            <span class="text-xs text-base-content/40">fast</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning text-sm">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+                    <div>
+                        <p class="font-bold">Audio not available</p>
+                        <p>No audio file for this song. You can still view the chords below.</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- Chord Fingering Diagrams -->
-    <div id="chord-diagrams-section" class="mb-6 hidden">
-        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-3">Chord Diagrams</h3>
-        <div id="chord-diagrams-strip" class="chord-diagrams-strip"></div>
+    <!-- STICKY CHORD DIAGRAMS ZONE -->
+    <div id="chord-diagrams-section" class="chords-sticky hidden">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-2">Chord Diagrams</h3>
+        <div class="chord-strip-wrapper">
+            <div id="chord-diagrams-strip" class="chord-diagrams-strip"></div>
+        </div>
     </div>
 
     <!-- Chords & Lyrics -->
@@ -171,6 +257,18 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+document.body.classList.add('player-page');
+// Set scroll speed BEFORE player.js loads so it overrides even cached versions
+window.cpScrollSpeed = 0.5;
+function updateStickyTops() {
+    var ps = document.querySelector('.player-sticky');
+    var cs = document.querySelector('.chords-sticky');
+    if (ps && cs) cs.style.top = (48 + ps.offsetHeight) + 'px';
+}
+document.addEventListener('DOMContentLoaded', updateStickyTops);
+window.addEventListener('resize', updateStickyTops);
+</script>
 <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 <script>
 lucide.createIcons();
@@ -462,6 +560,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Init existing player.js (handles auto-scroll etc.)
     if (typeof initPlayer === 'function') initPlayer();
+
+    // Speed slider
+    const speedSlider = document.getElementById('scroll-speed');
+    const speedControl = document.getElementById('speed-control');
+    const autoScrollToggle2 = document.getElementById('auto-scroll-toggle');
+
+    function applySpeed() {
+        // Map 1-10 → 0.1x-1.0x of natural audio sync speed
+        window.cpScrollSpeed = speedSlider.value * 0.1;
+    }
+    applySpeed(); // apply default on load
+
+    speedSlider.addEventListener('input', applySpeed);
+
+    // Show/hide speed control based on toggle
+    function syncSpeedVisibility() {
+        speedControl.style.opacity = autoScrollToggle2.checked ? '1' : '0.3';
+        speedControl.style.pointerEvents = autoScrollToggle2.checked ? '' : 'none';
+    }
+    syncSpeedVisibility();
+    autoScrollToggle2.addEventListener('change', syncSpeedVisibility);
 
     // Render chord diagrams after a tick (let ChordPro HTML render)
     setTimeout(() => {

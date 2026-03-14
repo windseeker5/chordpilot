@@ -17,6 +17,8 @@ let scrollStartTime = null;
 let scrollStartPosition = null;
 let totalScrollDistance = 0;
 let songDuration = 0;
+window.cpScrollSpeed = window.cpScrollSpeed || 0.5; // 0.5 = half of natural audio sync speed
+let scrollAccumulator = 0;
 
 /**
  * Initialize the player
@@ -157,16 +159,10 @@ function handleTimeUpdate() {
  * Handle seeked event (user manually seeks in audio)
  */
 function handleSeeked() {
+    // Don't jump scroll on buffer loads — just let auto-scroll continue
+    // Only restart the animation loop if it was running
     if (!audioPlayer.paused && isAutoScrollEnabled) {
-        // Stop current scroll and restart from new position
         stopAutoScroll();
-
-        // Calculate where we should be scrolled based on audio position
-        const progress = audioPlayer.currentTime / songDuration;
-        const targetScroll = progress * totalScrollDistance;
-        window.scrollTo(0, targetScroll);
-
-        // Restart auto-scroll
         startAutoScroll();
     }
 }
@@ -198,6 +194,7 @@ function stopAutoScroll() {
         cancelAnimationFrame(scrollAnimationId);
         scrollAnimationId = null;
     }
+    scrollAccumulator = 0;
 }
 
 /**
@@ -213,16 +210,13 @@ function autoScrollStep(currentTime) {
     const audioProgress = audioPlayer.currentTime / songDuration;
     const targetScrollPosition = audioProgress * totalScrollDistance;
 
-    // Smooth scroll to target position
-    const currentScroll = window.scrollY;
-    const diff = targetScrollPosition - currentScroll;
-
-    // Use a smooth interpolation (ease towards target)
-    if (Math.abs(diff) > 1) {
-        const scrollStep = diff * 0.1; // Adjust this for smoother/faster scrolling
-        window.scrollBy(0, scrollStep);
-    } else {
-        window.scrollTo(0, targetScrollPosition);
+    // Linear scroll: fixed px/frame based on song duration × speed factor
+    const pxPerSecond = (totalScrollDistance / songDuration) * (window.cpScrollSpeed || 0.5);
+    scrollAccumulator += pxPerSecond / 60;
+    if (scrollAccumulator >= 1) {
+        const steps = Math.floor(scrollAccumulator);
+        window.scrollBy(0, steps);
+        scrollAccumulator -= steps;
     }
 
     // Continue animation
@@ -244,3 +238,4 @@ function formatTime(seconds) {
 
 // Export for external use
 window.initPlayer = initPlayer;
+window.setScrollSpeed = function(v) { window.cpScrollSpeed = v; };
