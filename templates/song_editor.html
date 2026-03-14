@@ -60,46 +60,6 @@
 .verse  { margin-bottom: 1.5rem; }
 .chorus { margin-bottom: 1.5rem; padding-left: 1rem; border-left: 3px solid oklch(var(--p)); }
 
-/* Help section */
-details.help-section {
-    margin-top: 1rem;
-    border: 1px solid oklch(var(--b3));
-    border-radius: 8px;
-    overflow: hidden;
-}
-details.help-section summary {
-    padding: 10px 14px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-    background: oklch(var(--b2));
-    user-select: none;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-details.help-section summary::-webkit-details-marker { display: none; }
-details.help-section[open] summary { border-bottom: 1px solid oklch(var(--b3)); }
-.help-body { padding: 14px; font-size: 0.8125rem; }
-.help-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-@media (max-width: 640px) { .help-row { grid-template-columns: 1fr; } }
-code.example {
-    display: block;
-    background: oklch(var(--b2));
-    border: 1px solid oklch(var(--b3));
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-family: monospace;
-    font-size: 0.8125rem;
-    line-height: 1.6;
-    white-space: pre;
-    overflow-x: auto;
-    margin-top: 6px;
-    cursor: pointer;
-}
-code.example:hover { background: oklch(var(--b3)); }
-
 /* Save feedback */
 #save-status {
     font-size: 0.8125rem;
@@ -176,68 +136,6 @@ code.example:hover { background: oklch(var(--b3)); }
     </div><!-- /editor-wrap -->
 
 
-    <!-- ── ChordPro help section ── -->
-    <details class="help-section">
-        <summary>
-            <i data-lucide="book-open" style="width:14px;height:14px;opacity:0.6;flex-shrink:0;"></i>
-            ChordPro Syntax Guide
-            <i data-lucide="chevron-down" style="width:12px;height:12px;opacity:0.4;margin-left:auto;" id="help-chevron"></i>
-        </summary>
-        <div class="help-body">
-            <div class="help-row">
-                <div>
-                    <div style="font-weight:600;margin-bottom:8px;">Format 1 — ChordPro (recommended)</div>
-                    <p style="color:oklch(var(--bc)/0.6);margin:0 0 6px;">Put chords in <code>[brackets]</code> inline before the syllable they land on.</p>
-                    <code class="example" onclick="insertExample(this.textContent)">{title: Wish You Were Here}
-{artist: Pink Floyd}
-{key: G}
-
-{start_of_verse}
-So, so you [G]think you can [Em]tell,
-[G]heaven from [Em]hell?
-{end_of_verse}
-
-{start_of_chorus}
-[C]How I [G]wish you were [D]here
-{end_of_chorus}</code>
-                </div>
-                <div>
-                    <div style="font-weight:600;margin-bottom:8px;">Format 2 — Tab/UG style (auto-converts)</div>
-                    <p style="color:oklch(var(--bc)/0.6);margin:0 0 6px;">Chord names on a separate line above the lyrics, aligned by position.</p>
-                    <code class="example" onclick="insertExample(this.textContent)">[Verse 1]
-     C              G
-Look at the stars
-     Am             F
-Look how they shine for you
-
-[Chorus]
-     C              G
-And it was all yellow</code>
-                </div>
-            </div>
-
-            <div style="margin-top:14px;padding-top:14px;border-top:1px solid oklch(var(--b3));">
-                <div style="font-weight:600;margin-bottom:8px;">Common directives</div>
-                <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:0.8125rem;">
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{title: Song Title}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{artist: Artist Name}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{key: G}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{tempo: 120}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{start_of_verse}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{end_of_verse}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{start_of_chorus}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{end_of_chorus}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{comment: A note here}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{start_of_tab: Intro}</code>
-                    <code style="background:oklch(var(--b2));padding:3px 8px;border-radius:4px;">{end_of_tab}</code>
-                </div>
-                <p style="margin-top:8px;color:oklch(var(--bc)/0.5);font-size:0.75rem;">
-                    Tip: Click either code block above to paste it into the editor.
-                    Tab blocks use <code style="font-size:0.75rem;">{start_of_tab: Label}</code> … <code style="font-size:0.75rem;">{end_of_tab}</code> — paste standard ASCII tab (<code style="font-size:0.75rem;">e|---|</code> format) inside. Whitespace is preserved automatically.
-                </p>
-            </div>
-        </div>
-    </details>
 
 </div><!-- /max-w-none -->
 {% endblock %}
@@ -353,13 +251,6 @@ async function saveChords() {
     }
 }
 
-// ── Help examples: click to insert ───────────────
-function insertExample(text) {
-    editor.value = text.trim();
-    editor.focus();
-    updatePreview();
-}
-
 // ── Fetch from URL ────────────────────────────────
 async function fetchFromUrl() {
     var url = document.getElementById('fetch-url-input').value.trim();
@@ -388,13 +279,6 @@ async function fetchFromUrl() {
 
 document.getElementById('fetch-url-details').addEventListener('toggle', function() {
     var icon = document.getElementById('fetch-chevron');
-    icon.setAttribute('data-lucide', this.open ? 'chevron-up' : 'chevron-down');
-    lucide.createIcons();
-});
-
-// ── Help chevron toggle ───────────────────────────
-document.querySelector('details.help-section').addEventListener('toggle', function(e) {
-    var icon = document.getElementById('help-chevron');
     icon.setAttribute('data-lucide', this.open ? 'chevron-up' : 'chevron-down');
     lucide.createIcons();
 });

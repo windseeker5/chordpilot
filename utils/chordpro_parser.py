@@ -2,6 +2,7 @@
 ChordPro Parser for Guitar Practice App
 Parses .cho files and converts to HTML with Tailwind CSS classes
 """
+import html
 import re
 from typing import Dict, List, Tuple
 
@@ -27,9 +28,24 @@ def parse_chordpro(file_path: str) -> Dict:
     # Parse lines and convert to HTML
     html_lines = []
     lines = content.split('\n')
-    in_verse = False
-    in_chorus = False
     in_tab = False
+    in_section = None  # tracks current open section type
+
+    # Map from directive keyword to (css_classes, display_label)
+    SECTION_MAP = {
+        'verse':     ('verse my-3',                                              'Verse'),
+        'chorus':    ('chorus my-3 ml-8 border-l-4 border-blue-500 pl-4',       'Chorus'),
+        'bridge':    ('bridge my-3',                                             'Bridge'),
+        'intro':     ('intro-section my-3',                                      'Intro'),
+        'outro':     ('outro-section my-3',                                      'Outro'),
+        'prechorus': ('prechorus my-3',                                          'Pre-Chorus'),
+    }
+
+    def _close_section():
+        nonlocal in_section
+        if in_section:
+            html_lines.append('</div>')
+            in_section = None
 
     for original_line in lines:
         line = original_line.strip()
@@ -43,6 +59,7 @@ def parse_chordpro(file_path: str) -> Dict:
             if line.startswith('{') and 'end_of_tab' in line.lower():
                 html_lines.append('</pre></div>')
                 in_tab = False
+                in_section = None
             else:
                 html_lines.append(original_line.rstrip())
             continue
@@ -52,34 +69,41 @@ def parse_chordpro(file_path: str) -> Dict:
             directive_lower = line.lower()
 
             if 'start_of_tab' in directive_lower:
+                _close_section()
                 label_match = re.search(r'\{start_of_tab:?\s*(.+?)\}', line, re.IGNORECASE)
                 label = label_match.group(1).strip() if label_match else 'Tab'
                 html_lines.append(
-                    f'<div class="tab-section"><div class="tab-label">{label}</div>'
+                    f'<div class="tab-section">'
+                    f'<div class="tab-label">{label}</div>'
                     '<pre class="tab-pre">'
                 )
                 in_tab = True
+                in_section = 'tab'
                 continue
             elif 'end_of_tab' in directive_lower:
                 html_lines.append('</pre></div>')
                 in_tab = False
+                in_section = None
                 continue
-            elif 'start_of_verse' in directive_lower or 'sov' in directive_lower:
-                html_lines.append('<div class="verse my-6">')
-                in_verse = True
+
+            # Generic start_of_* handler
+            start_match = re.match(r'\{start_of_(\w+)(?::?\s*(.+?))?\}', line, re.IGNORECASE)
+            if start_match:
+                _close_section()
+                sec_key = start_match.group(1).lower()
+                sec_label_override = start_match.group(2).strip() if start_match.group(2) else None
+                css, default_label = SECTION_MAP.get(sec_key, ('my-6', sec_key.title()))
+                display_label = sec_label_override or default_label
+                html_lines.append(f'<div class="{css}">')
+                html_lines.append(f'<div class="section-label">{display_label}</div>')
+                in_section = sec_key
                 continue
-            elif 'end_of_verse' in directive_lower or 'eov' in directive_lower:
-                html_lines.append('</div>')
-                in_verse = False
+
+            # Generic end_of_* handler
+            if re.match(r'\{end_of_\w+\}', line, re.IGNORECASE):
+                _close_section()
                 continue
-            elif 'start_of_chorus' in directive_lower or 'soc' in directive_lower:
-                html_lines.append('<div class="chorus my-6 ml-8 border-l-4 border-blue-500 pl-4">')
-                in_chorus = True
-                continue
-            elif 'end_of_chorus' in directive_lower or 'eoc' in directive_lower:
-                html_lines.append('</div>')
-                in_chorus = False
-                continue
+
             elif 'comment' in directive_lower or 'c:' in directive_lower:
                 comment = re.search(r'\{(?:comment:|c:)\s*(.+?)\}', line, re.IGNORECASE)
                 if comment:
@@ -101,10 +125,7 @@ def parse_chordpro(file_path: str) -> Dict:
     # Close any open sections
     if in_tab:
         html_lines.append('</pre></div>')
-    if in_verse:
-        html_lines.append('</div>')
-    if in_chorus:
-        html_lines.append('</div>')
+    _close_section()
 
     return {
         'title': title.group(1) if title else 'Unknown',
@@ -147,11 +168,37 @@ def parse_chord_line(line: str) -> str:
         plain = chord_pattern.sub(r'\1', line)
         return f'<div class="lyric-line text-2xl my-1 leading-relaxed">{plain}</div>'
 
+    # Only iterate over valid-chord matches; invalid brackets become inline text
+    valid_matches = [m for m in all_matches if _CHORD_NAME_RE.match(m.group(1))]
+
+    # Detect chord-only progression lines (no real lyric text anywhere on the line)
+    def _all_lyrics_empty():
+        if not valid_matches:
+            return False
+        # Check text BEFORE the first chord
+        before_first = line[:valid_matches[0].start()]
+        before_first = chord_pattern.sub(lambda mm: mm.group(1) if not _CHORD_NAME_RE.match(mm.group(1)) else '', before_first)
+        if before_first.strip():
+            return False
+        # Check text AFTER each chord
+        for i, m in enumerate(valid_matches):
+            next_start = valid_matches[i + 1].start() if i + 1 < len(valid_matches) else len(line)
+            after = line[m.end():next_start]
+            after = chord_pattern.sub(lambda mm: mm.group(1) if not _CHORD_NAME_RE.match(mm.group(1)) else '', after)
+            if after.strip():
+                return False
+        return True
+
+    if _all_lyrics_empty():
+        chips = ''.join(
+            f'<span class="chord-chip">{m.group(1)}</span>'
+            for m in valid_matches
+        )
+        return f'<div class="chord-prog-line my-3">{chips}</div>'
+
     result_html = '<div class="chord-line my-2">'
 
     pos = 0
-    # Only iterate over valid-chord matches; invalid brackets become inline text
-    valid_matches = [m for m in all_matches if _CHORD_NAME_RE.match(m.group(1))]
 
     for i, match in enumerate(valid_matches):
         chord_name = match.group(1)
@@ -165,7 +212,7 @@ def parse_chord_line(line: str) -> str:
             result_html += (
                 '<span class="chord-segment">'
                 '<span class="chord"></span>'
-                f'<span class="lyric text-2xl">{before}</span>'
+                f'<span class="lyric text-2xl">{html.escape(before)}</span>'
                 '</span>'
             )
 
@@ -175,13 +222,17 @@ def parse_chord_line(line: str) -> str:
         # Strip brackets from invalid [bracket] content in 'after'
         after = chord_pattern.sub(lambda m: m.group(1) if not _CHORD_NAME_RE.match(m.group(1)) else m.group(0), after)
 
-        # Trailing chord with no lyric text looks like a subscript — give it a nbsp
-        display_after = after if after.strip() else ('\u00a0' if not after else after)
+        # When trailing text has no real content, pad with nbsp proportional to chord name
+        # so adjacent chords (e.g. [B] [Bsus4]) don't visually merge
+        if not after.strip():
+            display_after = '\u00a0' * max(len(chord_name) + 1, 3)
+        else:
+            display_after = after
 
         result_html += (
             '<span class="chord-segment">'
             f'<span class="chord text-blue-600 font-bold whitespace-nowrap">{chord_name}</span>'
-            f'<span class="lyric text-2xl">{display_after}</span>'
+            f'<span class="lyric text-2xl">{html.escape(display_after)}</span>'
             '</span>'
         )
 

@@ -2,118 +2,562 @@
 
 {% block title %}Home — ChordPilot{% endblock %}
 
+{% block page_title %}
+<div style="display:flex;justify-content:center;width:100%;">
+    <label style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1.5px solid #e8ecf0;border-radius:8px;padding:5px 13px;width:100%;max-width:380px;transition:border-color 0.15s,box-shadow 0.15s;"
+           onfocusin="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)';this.style.background='#fff'"
+           onfocusout="this.style.borderColor='#e8ecf0';this.style.boxShadow='';this.style.background='#f8fafc'">
+        <i data-lucide="search" style="width:14px;height:14px;color:#94a3b8;flex-shrink:0;"></i>
+        <input type="text" id="homeSearch" placeholder="Search songs or artists…"
+               style="border:none;outline:none;background:transparent;font-size:0.8125rem;color:#0f172a;width:100%;font-family:'DM Sans',sans-serif;"
+               oninput="filterHomeCards()" />
+    </label>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    /* ── H1 spec (exact match from user) ── */
+    .cp-h1 {
+        font-family: 'Roboto Slab', serif !important;
+        font-weight: 600 !important;
+        font-size: 2rem !important;
+        color: #1a1f36 !important;
+        letter-spacing: -0.02em !important;
+        line-height: 1.2 !important;
+        margin: 0;
+    }
+    [data-theme="dark"] .cp-h1 { color: #e2e8f0 !important; }
+
+    body, .home-wrap { font-family: 'DM Sans', sans-serif; background: #fff; }
+
+    /* ── Eyebrow label above each section ── */
+    .eyebrow {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin: 0 0 4px;
+    }
+
+    /* ── Practice card — entire card is a link ── */
+    .pcard {
+        display: block;
+        text-decoration: none;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e8ecf0;
+        overflow: hidden;
+        transition: box-shadow 0.18s, transform 0.15s, border-color 0.18s;
+        cursor: pointer;
+    }
+    .pcard:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.09);
+        transform: translateY(-2px);
+        border-color: #bfdbfe;
+    }
+    [data-theme="dark"] .pcard { background: oklch(var(--b2)); border-color: oklch(var(--b3)); }
+    [data-theme="dark"] .pcard:hover { border-color: oklch(var(--p)/0.5); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+
+    .pcard-bar { height: 3px; }
+    .pcard-body { padding: 14px 16px 16px; }
+
+    .pcard-icon {
+        width: 38px; height: 38px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+    .pcard-name {
+        font-size: 0.875rem; font-weight: 600; color: #0f172a;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    [data-theme="dark"] .pcard-name { color: #f1f5f9; }
+    .pcard-artist { font-size: 0.72rem; color: #94a3b8; margin-top: 1px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pcard-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 0.68rem; font-weight: 700; color: #64748b;
+        background: #f1f5f9; border-radius: 999px; padding: 2px 8px;
+        flex-shrink: 0; white-space: nowrap;
+    }
+    [data-theme="dark"] .pcard-badge { background: oklch(var(--b3)); color: oklch(var(--bc)/0.55); }
+
+    /* ── Search ── */
+    .home-search {
+        display: flex; align-items: center; gap: 10px;
+        background: #f8fafc; border: 1.5px solid #e8ecf0;
+        border-radius: 10px; padding: 9px 14px;
+        width: 100%; max-width: 340px;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .home-search:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); background: #fff; }
+    .home-search input { border: none; outline: none; background: transparent; font-size: 0.875rem; color: #0f172a; width: 100%; font-family: 'DM Sans', sans-serif; }
+    [data-theme="dark"] .home-search { background: oklch(var(--b2)); border-color: oklch(var(--b3)); }
+    [data-theme="dark"] .home-search input { color: oklch(var(--bc)); }
+
+    /* ── Stat pill ── */
+    .stat-pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 12px; background: #f1f5f9; border-radius: 999px;
+        font-size: 0.72rem; font-weight: 600; color: #64748b;
+    }
+    [data-theme="dark"] .stat-pill { background: oklch(var(--b3)); color: oklch(var(--bc)/0.6); }
+
+    /* ── Section link ── */
+    .sec-link {
+        font-size: 0.8125rem; font-weight: 500; color: #3b82f6;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+        transition: gap 0.15s;
+    }
+    .sec-link:hover { gap: 7px; }
+
+    /* ── Trending: compact ranked list ── */
+    .trend-row {
+        display: flex; align-items: center; gap: 14px;
+        padding: 10px 14px; border-radius: 10px;
+        border: 1px solid #f1f5f9; background: #fff;
+        transition: background 0.12s, border-color 0.12s;
+    }
+    .trend-row:hover { background: #f8fafc; border-color: #e2e8f0; }
+    [data-theme="dark"] .trend-row { background: oklch(var(--b2)); border-color: oklch(var(--b3)/0.4); }
+    [data-theme="dark"] .trend-row:hover { background: oklch(var(--b3)); }
+
+    .trend-rank {
+        font-family: 'Roboto Slab', serif;
+        font-size: 1rem; font-weight: 600;
+        color: #cbd5e1; width: 26px; text-align: right; flex-shrink: 0;
+    }
+    .trend-rank.top3 { color: #3b82f6; }
+
+    .trend-thumb {
+        width: 44px; height: 44px; border-radius: 8px;
+        object-fit: cover; flex-shrink: 0;
+    }
+    .trend-thumb-fallback {
+        width: 44px; height: 44px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .trend-title { font-size: 0.875rem; font-weight: 600; color: #0f172a;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    [data-theme="dark"] .trend-title { color: #f1f5f9; }
+    .trend-artist { font-size: 0.72rem; color: #94a3b8; margin-top: 1px; }
+
+    .genre-badge {
+        font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em;
+        padding: 2px 8px; border-radius: 999px;
+        background: #eff6ff; color: #3b82f6;
+        white-space: nowrap; flex-shrink: 0;
+    }
+
+    .trend-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .trend-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 6px;
+        font-size: 0.7rem; font-weight: 600;
+        text-decoration: none; white-space: nowrap;
+        border: 1px solid transparent;
+        transition: background 0.12s, color 0.12s;
+    }
+    .trend-btn-apple { background: #f1f5f9; color: #374151; border-color: #e2e8f0; }
+    .trend-btn-apple:hover { background: #fee2e2; color: #ef4444; border-color: #fecaca; }
+    .trend-btn-lib { background: #eff6ff; color: #3b82f6; border-color: #bfdbfe; }
+    .trend-btn-lib:hover { background: #dbeafe; }
+    [data-theme="dark"] .trend-btn-apple { background: oklch(var(--b3)); color: oklch(var(--bc)/0.7); border-color: oklch(var(--b3)); }
+    [data-theme="dark"] .trend-btn-lib { background: oklch(var(--p)/0.1); color: oklch(var(--p)); border-color: oklch(var(--p)/0.3); }
+
+    /* ── Tutorial card ── */
+    .tutcard {
+        background: #fff; border-radius: 12px; border: 1px solid #e8ecf0;
+        overflow: hidden; transition: box-shadow 0.18s, transform 0.15s;
+    }
+    .tutcard:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.09); transform: translateY(-2px); }
+    [data-theme="dark"] .tutcard { background: oklch(var(--b2)); border-color: oklch(var(--b3)); }
+    .tutcard-img { width: 100%; height: 126px; object-fit: cover; display: block; }
+    .tutcard-fallback { width: 100%; height: 126px; display: flex; align-items: center; justify-content: center; }
+
+    .btn-watch {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 5px 12px; background: #ef4444; color: #fff;
+        border-radius: 6px; font-size: 0.72rem; font-weight: 600;
+        text-decoration: none; transition: background 0.12s;
+    }
+    .btn-watch:hover { background: #dc2626; }
+
+    /* Source stamp */
+    .source-stamp {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 0.65rem; color: #94a3b8; font-weight: 500;
+    }
+
+    .section-block { margin-bottom: 3rem; }
+    .hscroll { scrollbar-width: none; }
+    .hscroll::-webkit-scrollbar { display: none; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto" style="background:#fff;">
 
-    <!-- ── Welcome + Stats ── -->
-    <div class="mb-7">
-        <h1 class="text-xl font-semibold mb-4">
-            {% if current_user %}Welcome back, {{ current_user.username }}{% else %}My Practice{% endif %}
-        </h1>
-
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div class="rounded-lg border border-base-300 bg-base-100 p-4">
-                <div class="text-2xl font-bold text-primary">{{ songs|length }}</div>
-                <div class="text-xs text-base-content/50 mt-0.5 font-medium">Songs in Library</div>
-            </div>
-            <div class="rounded-lg border border-base-300 bg-base-100 p-4">
-                <div class="text-2xl font-bold text-primary">{{ total_plays }}</div>
-                <div class="text-xs text-base-content/50 mt-0.5 font-medium">Total Plays</div>
-            </div>
-            <div class="rounded-lg border border-base-300 bg-base-100 p-4 hidden sm:block">
-                <div class="text-2xl font-bold text-primary">{{ practiced_count }}</div>
-                <div class="text-xs text-base-content/50 mt-0.5 font-medium">Practiced Songs</div>
-            </div>
+    <!-- ══════════════════════════════════════════════
+         HEADER — welcome + stats (search is in topbar)
+    ══════════════════════════════════════════════ -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:2.5rem;">
+        <div>
+            <div class="eyebrow">Guitar Practice</div>
+            <h1 class="cp-h1">
+                {% if current_user %}Welcome back,<br>
+                <span style="color:#3b82f6;">{{ current_user.username }}</span>
+                {% else %}My Practice{% endif %}
+            </h1>
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end;">
+            <div class="stat-pill"><i data-lucide="music-2" style="width:12px;height:12px;"></i>{{ songs|length }} songs</div>
+            <div class="stat-pill"><i data-lucide="play" style="width:12px;height:12px;"></i>{{ total_plays }} plays</div>
+            <div class="stat-pill"><i data-lucide="check-circle" style="width:12px;height:12px;"></i>{{ practiced_count }} practiced</div>
         </div>
     </div>
 
-    <!-- ── Centered search ── -->
-    <div class="flex justify-center mb-6">
-        <label style="display:flex;align-items:center;gap:8px;border:1px solid oklch(var(--b3));border-radius:8px;padding:8px 16px;background:oklch(var(--b1));width:100%;max-width:420px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-            <i data-lucide="search" style="width:15px;height:15px;opacity:0.4;flex-shrink:0;"></i>
-            <input type="text" id="homeSearch"
-                   placeholder="Search songs or artists…"
-                   style="border:none;outline:none;background:transparent;font-size:0.9rem;width:100%;"
-                   oninput="filterHomeCards()" />
-        </label>
-    </div>
+    <!-- ══════════════════════════════════════════════
+         MY PRACTICE
+    ══════════════════════════════════════════════ -->
+    <div class="section-block">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.25rem;">
+            <div>
+                <div class="eyebrow">Your songs</div>
+                <h2 class="cp-h1">My Practice</h2>
+            </div>
+            <a href="/library" class="sec-link">
+                View all <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </a>
+        </div>
 
-    {% if songs %}
-    <!-- ── Song Cards Grid ── -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" id="home-song-grid">
-        {% for song in songs %}
-        <div class="song-card card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-md transition-all duration-200"
-             data-title="{{ song.title|lower }}"
-             data-artist="{{ (song.artist or '')|lower }}">
-            <div class="card-body p-4">
-                <!-- Icon + Title -->
-                <div class="flex items-start gap-3">
-                    <div class="p-2 rounded-lg bg-primary/10 text-primary shrink-0 mt-0.5">
-                        <i data-lucide="music-2" class="w-4 h-4"></i>
+        {% if songs %}
+        {% set bar_colors = ['#3b82f6,#6366f1','#8b5cf6,#ec4899','#10b981,#06b6d4','#f59e0b,#ef4444','#3b82f6,#10b981','#ec4899,#f97316'] %}
+        {% set icon_bg   = ['#eff6ff','#f5f3ff','#ecfdf5','#fffbeb','#eff6ff','#fdf2f8'] %}
+        {% set icon_col  = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#3b82f6','#ec4899'] %}
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" id="home-song-grid">
+            {% for song in top_songs %}
+            {% set ci = loop.index0 % 6 %}
+            <a href="/song/{{ song.song_id }}" class="pcard song-card"
+               data-title="{{ song.title|lower }}"
+               data-artist="{{ (song.artist or '')|lower }}">
+                <div class="pcard-bar" style="background:linear-gradient(90deg,{{ bar_colors[ci] }});"></div>
+                <div class="pcard-body">
+                    <div style="display:flex;align-items:center;gap:11px;">
+                        <div class="pcard-icon" style="background:{{ icon_bg[ci] }};">
+                            <i data-lucide="music-2" style="width:17px;height:17px;color:{{ icon_col[ci] }};"></i>
+                        </div>
+                        <div style="min-width:0;flex:1;">
+                            <div class="pcard-name">{{ song.title }}</div>
+                            <div class="pcard-artist">{{ song.artist or 'Unknown Artist' }}</div>
+                        </div>
+                        {% if song.play_count %}
+                        <div class="pcard-badge">
+                            <i data-lucide="play" style="width:9px;height:9px;"></i>{{ song.play_count }}
+                        </div>
+                        {% endif %}
                     </div>
-                    <div class="min-w-0 flex-1">
-                        <h2 class="font-semibold text-sm leading-tight truncate">{{ song.title }}</h2>
-                        <p class="text-base-content/50 text-xs truncate mt-0.5">
-                            {{ song.artist or 'Unknown Artist' }}
-                        </p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <div id="home-no-results" class="hidden" style="padding:2.5rem 0;text-align:center;">
+            <i data-lucide="search-x" style="width:28px;height:28px;color:#cbd5e1;display:block;margin:0 auto 8px;"></i>
+            <p style="font-size:0.875rem;color:#94a3b8;">No songs match your search.</p>
+        </div>
+
+        {% else %}
+        <div style="text-align:center;padding:3.5rem 0;">
+            <div style="width:56px;height:56px;border-radius:50%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                <i data-lucide="music-2" style="width:24px;height:24px;color:#cbd5e1;"></i>
+            </div>
+            <p style="font-size:1rem;font-weight:600;color:#0f172a;margin:0 0 6px;">No songs yet</p>
+            <p style="font-size:0.875rem;color:#94a3b8;margin:0 0 1.25rem;">Add songs to your library to start practicing.</p>
+            <a href="/library" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:#3b82f6;color:#fff;border-radius:8px;font-size:0.875rem;font-weight:600;text-decoration:none;">
+                <i data-lucide="library" style="width:14px;height:14px;"></i>Go to Library
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         POPULAR RIGHT NOW — two sub-sections
+    ══════════════════════════════════════════════ -->
+    <div class="section-block">
+        <div style="margin-bottom:1.5rem;">
+            <div class="eyebrow">Charts</div>
+            <h2 class="cp-h1">Popular Right Now</h2>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+            <!-- ── LEFT: Global Streaming ── -->
+            <div>
+                <!-- Sub-header -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #3b82f6;">
+                    <div style="display:flex;align-items:center;gap:7px;">
+                        <i data-lucide="globe-2" style="width:14px;height:14px;color:#3b82f6;"></i>
+                        <span style="font-size:0.8125rem;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">Global Streaming</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;color:#94a3b8;">
+                        {% if global_chart and global_chart[0].source == 'Deezer Charts' %}
+                        <i data-lucide="wifi" style="width:10px;height:10px;color:#10b981;"></i>
+                        Deezer · {{ fetched_at }}
+                        {% else %}
+                        <i data-lucide="wifi-off" style="width:10px;height:10px;color:#f59e0b;"></i>
+                        Offline
+                        {% endif %}
                     </div>
                 </div>
 
-                <!-- Badges -->
-                <div class="flex flex-wrap gap-1.5 mt-2.5">
-                    {% if song.key %}
-                    <span class="badge badge-secondary badge-sm">{{ song.key }}</span>
-                    {% endif %}
-                    {% if song.play_count %}
-                    <span class="badge badge-ghost badge-sm">
-                        {{ song.play_count }} play{{ 's' if song.play_count != 1 }}
-                    </span>
-                    {% endif %}
-                    {% if song.last_played %}
-                    <span class="badge badge-ghost badge-sm text-base-content/40">
-                        Last: {{ song.last_played[:10] }}
-                    </span>
-                    {% endif %}
+                {% if global_chart %}
+                {% set gfb = ['#3b82f6,#6366f1','#8b5cf6,#ec4899','#10b981,#06b6d4','#f59e0b,#ef4444','#ec4899,#f43f5e','#14b8a6,#6366f1','#f97316,#f59e0b','#3b82f6,#10b981','#6366f1,#8b5cf6','#ef4444,#f97316'] %}
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    {% for t in global_chart %}
+                    <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;transition:background 0.12s;"
+                         onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                        <!-- Rank -->
+                        <span style="font-family:'Roboto Slab',serif;font-size:0.8rem;font-weight:600;color:{% if t.rank <= 3 %}#3b82f6{% else %}#cbd5e1{% endif %};width:22px;text-align:right;flex-shrink:0;">#{{ t.rank }}</span>
+
+                        <!-- Art -->
+                        {% if t.image %}
+                        <img src="{{ t.image }}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <div style="display:none;width:36px;height:36px;border-radius:6px;background:linear-gradient(135deg,{{ gfb[loop.index0 % 10] }});flex-shrink:0;align-items:center;justify-content:center;">
+                            <i data-lucide="music" style="width:14px;height:14px;color:rgba(255,255,255,0.9);"></i>
+                        </div>
+                        {% else %}
+                        <div style="width:36px;height:36px;border-radius:6px;background:linear-gradient(135deg,{{ gfb[loop.index0 % 10] }});flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                            <i data-lucide="music" style="width:14px;height:14px;color:rgba(255,255,255,0.9);"></i>
+                        </div>
+                        {% endif %}
+
+                        <!-- Info -->
+                        <div style="min-width:0;flex:1;">
+                            <div style="font-size:0.8rem;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.title }}</div>
+                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:1px;">{{ t.artist }}</div>
+                        </div>
+
+                        <!-- Score + actions -->
+                        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                            {% if t.score %}
+                            <span style="font-size:0.65rem;font-weight:700;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 6px;white-space:nowrap;" title="Deezer popularity score — proprietary metric, not stream count">score {{ t.score }}</span>
+                            {% endif %}
+                            {% if t.link %}
+                            <a href="{{ t.link }}" target="_blank" rel="noopener"
+                               style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
+                               onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                                <i data-lucide="headphones" style="width:9px;height:9px;"></i>Listen
+                            </a>
+                            {% endif %}
+                            <a href="/library?q={{ (t.title + ' ' + t.artist)|urlencode }}"
+                               style="display:inline-flex;align-items:center;padding:3px 7px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
+                               onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                                <i data-lucide="search" style="width:9px;height:9px;"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="padding:2rem 1rem;text-align:center;color:#94a3b8;font-size:0.8125rem;">
+                    <i data-lucide="wifi-off" style="width:22px;height:22px;display:block;margin:0 auto 8px;color:#cbd5e1;"></i>
+                    Could not reach Deezer. Check your internet connection.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- ── RIGHT: Guitar Tab Trends ── -->
+            <div>
+                <!-- Sub-header -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #f97316;">
+                    <div style="display:flex;align-items:center;gap:7px;">
+                        <i data-lucide="music-4" style="width:14px;height:14px;color:#f97316;"></i>
+                        <span style="font-size:0.8125rem;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">Top Guitar Tabs · Daily</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;color:#94a3b8;">
+                        {% if guitar_chart and guitar_chart[0].source == 'Ultimate Guitar' %}
+                        <i data-lucide="wifi" style="width:10px;height:10px;color:#10b981;"></i>
+                        Ultimate Guitar · {{ fetched_at }}
+                        {% else %}
+                        <i data-lucide="wifi-off" style="width:10px;height:10px;color:#f59e0b;"></i>
+                        Offline
+                        {% endif %}
+                    </div>
                 </div>
 
-                <!-- Practice button -->
-                <div class="mt-3">
-                    <a href="/song/{{ song.song_id }}" class="cp-btn cp-btn-primary cp-btn-sm w-full gap-1">
-                        <i data-lucide="play" class="w-3 h-3"></i>
-                        Practice
-                    </a>
+                {% if guitar_chart %}
+                {% set ugfb = ['#f97316,#ef4444','#f59e0b,#f97316','#10b981,#f97316','#8b5cf6,#f97316','#3b82f6,#f97316','#ec4899,#f97316'] %}
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    {% for t in guitar_chart %}
+                    <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;transition:background 0.12s;"
+                         onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='transparent'">
+                        <!-- Rank -->
+                        <span style="font-family:'Roboto Slab',serif;font-size:0.8rem;font-weight:600;color:{% if t.rank <= 3 %}#f97316{% else %}#cbd5e1{% endif %};width:22px;text-align:right;flex-shrink:0;">#{{ t.rank }}</span>
+
+                        <!-- Album art if UG provides it, else gradient fallback -->
+                        {% if t.image %}
+                        <img src="{{ t.image }}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <div style="display:none;width:36px;height:36px;border-radius:6px;background:linear-gradient(135deg,{{ ugfb[loop.index0 % 6] }});flex-shrink:0;align-items:center;justify-content:center;">
+                            <i data-lucide="music-2" style="width:14px;height:14px;color:rgba(255,255,255,0.92);"></i>
+                        </div>
+                        {% else %}
+                        <div style="width:36px;height:36px;border-radius:6px;background:linear-gradient(135deg,{{ ugfb[loop.index0 % 6] }});flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                            <i data-lucide="music-2" style="width:14px;height:14px;color:rgba(255,255,255,0.92);"></i>
+                        </div>
+                        {% endif %}
+
+                        <!-- Info -->
+                        <div style="min-width:0;flex:1;">
+                            <div style="font-size:0.8rem;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.title }}</div>
+                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:1px;">{{ t.artist }}</div>
+                        </div>
+
+                        <!-- Views + actions -->
+                        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                            {% if t.tab_type %}
+                            <span style="font-size:0.6rem;font-weight:600;color:#9ca3af;background:#f3f4f6;border-radius:3px;padding:1px 5px;white-space:nowrap;">{{ t.tab_type }}</span>
+                            {% endif %}
+                            {% if t.hits %}
+                            <span style="font-size:0.65rem;font-weight:700;color:#78716c;background:#fff7ed;border-radius:4px;padding:2px 6px;white-space:nowrap;" title="Daily hits on Ultimate Guitar">{{ t.hits }}</span>
+                            {% endif %}
+                            {% if t.tab_url %}
+                            <a href="{{ t.tab_url }}" target="_blank" rel="noopener"
+                               style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#fff7ed;color:#f97316;border:1px solid #fed7aa;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
+                               onmouseover="this.style.background='#ffedd5'" onmouseout="this.style.background='#fff7ed'">
+                                <i data-lucide="external-link" style="width:9px;height:9px;"></i>Tab
+                            </a>
+                            {% endif %}
+                            <a href="/library?q={{ (t.title + ' ' + t.artist)|urlencode }}"
+                               style="display:inline-flex;align-items:center;padding:3px 7px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
+                               onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                                <i data-lucide="search" style="width:9px;height:9px;"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="padding:2rem 1rem;text-align:center;color:#94a3b8;font-size:0.8125rem;">
+                    <i data-lucide="wifi-off" style="width:22px;height:22px;display:block;margin:0 auto 8px;color:#cbd5e1;"></i>
+                    Could not reach Ultimate Guitar. Check your internet connection.
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         MY TUTORIALS
+    ══════════════════════════════════════════════ -->
+    <div class="section-block">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.25rem;">
+            <div>
+                <div class="eyebrow">Video lessons</div>
+                <h2 class="cp-h1">My Tutorials</h2>
+            </div>
+            <a href="/library#tutorials" class="sec-link">
+                Manage <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            </a>
+        </div>
+
+        {% if tutorials %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {% for tut in tutorials %}
+            <div class="tutcard" onclick="openLightbox('{{ tut.url }}')"
+                 style="cursor:pointer;">
+                <!-- Thumbnail with play overlay -->
+                <div style="position:relative;">
+                    {% if tut.thumbnail %}
+                    <img src="{{ tut.thumbnail }}" alt="{{ tut.title }}" class="tutcard-img"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <div style="display:none;background:linear-gradient(135deg,#1e1e1e,#3d3d3d);" class="tutcard-fallback"></div>
+                    {% else %}
+                    <div class="tutcard-fallback" style="background:linear-gradient(135deg,#1e1e1e,#3d3d3d);"></div>
+                    {% endif %}
+                    <!-- Play icon overlay -->
+                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);transition:background 0.2s;" class="tut-overlay">
+                        <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;transform:scale(0.85);transition:transform 0.2s;box-shadow:0 2px 12px rgba(0,0,0,0.3);">
+                            <i data-lucide="play" style="width:18px;height:18px;color:#1e1e1e;margin-left:2px;"></i>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding:12px 13px 14px;">
+                    <div style="font-size:0.875rem;font-weight:600;color:#0f172a;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="{{ tut.title }}">
+                        {{ tut.title }}
+                    </div>
+                    {% if tut.channel %}<div style="font-size:0.72rem;color:#94a3b8;margin-top:3px;">{{ tut.channel }}</div>{% endif %}
+                    <div style="font-size:0.7rem;color:#cbd5e1;margin-top:8px;">{{ (tut.date_added or '')[:10] }}</div>
                 </div>
             </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
 
-    <!-- No search results -->
-    <div id="home-no-results" class="hidden py-12 text-center">
-        <i data-lucide="search-x" class="w-8 h-8 text-base-content/30 mx-auto mb-2"></i>
-        <p class="text-base-content/60 text-sm">No songs match your search.</p>
-    </div>
+        <style>
+            .tutcard:hover .tut-overlay { background: rgba(0,0,0,0.25) !important; }
+            .tutcard:hover .tut-overlay > div { transform: scale(1) !important; }
+        </style>
 
-    {% else %}
-    <!-- Empty state -->
-    <div class="flex flex-col items-center justify-center py-20 text-center">
-        <div class="p-4 rounded-full bg-base-200 mb-4">
-            <i data-lucide="music-2" class="w-10 h-10 text-base-content/30"></i>
+        {% else %}
+        <div style="border-radius:12px;border:1.5px dashed #e2e8f0;padding:2.5rem 2rem;text-align:center;">
+            <div style="width:48px;height:48px;border-radius:10px;background:#fff1f2;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+                <i data-lucide="youtube" style="width:22px;height:22px;color:#ef4444;"></i>
+            </div>
+            <p style="font-size:0.9rem;font-weight:600;color:#0f172a;margin:0 0 4px;">No tutorials yet</p>
+            <p style="font-size:0.8125rem;color:#94a3b8;margin:0 0 1.25rem;">Save YouTube lessons to watch alongside your practice.</p>
+            <a href="/library#tutorials" style="display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#ef4444;color:#fff;border-radius:7px;font-size:0.8125rem;font-weight:600;text-decoration:none;">
+                <i data-lucide="plus" style="width:13px;height:13px;"></i>Add your first tutorial
+            </a>
         </div>
-        <h3 class="text-xl font-bold mb-2">No songs yet</h3>
-        <p class="text-base-content/60 text-sm mb-5 max-w-xs">
-            Add songs to your library to start practicing.
-        </p>
-        <a href="/library" class="cp-btn cp-btn-primary gap-1">
-            <i data-lucide="library" class="w-4 h-4"></i>
-            Go to Library
-        </a>
+        {% endif %}
     </div>
-    {% endif %}
 
 </div>
 
 <script>
+// ── YouTube Lightbox ──────────────────────────────
+function getYouTubeId(url) {
+    var m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+    return m ? m[1] : null;
+}
+
+function openLightbox(url) {
+    var vid = getYouTubeId(url);
+    var lb  = document.getElementById('video-lightbox');
+    var fr  = document.getElementById('lightbox-iframe');
+    if (!lb || !fr) return;
+    if (vid) {
+        fr.src = 'https://www.youtube.com/embed/' + vid + '?autoplay=1&rel=0';
+    } else {
+        // Non-YouTube URL — open in new tab as fallback
+        window.open(url, '_blank');
+        return;
+    }
+    lb.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    var lb = document.getElementById('video-lightbox');
+    var fr = document.getElementById('lightbox-iframe');
+    if (lb) lb.style.display = 'none';
+    if (fr) fr.src = '';   // stops video
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLightbox();
+});
+
+// ─────────────────────────────────────────────────
 function filterHomeCards() {
     var q = (document.getElementById('homeSearch').value || '').toLowerCase();
     var visible = 0;
@@ -125,7 +569,43 @@ function filterHomeCards() {
     var noResults = document.getElementById('home-no-results');
     if (noResults) noResults.classList.toggle('hidden', visible > 0 || !q);
 }
-
 document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
 </script>
+
+<!-- ── VIDEO LIGHTBOX ───────────────────────────── -->
+<div id="video-lightbox"
+     onclick="if(event.target===this)closeLightbox()"
+     style="display:none;position:fixed;inset:0;z-index:9999;
+            background:rgba(0,0,0,0.88);
+            align-items:center;justify-content:center;
+            backdrop-filter:blur(4px);">
+
+    <!-- Close button -->
+    <button onclick="closeLightbox()"
+            style="position:fixed;top:20px;right:24px;
+                   background:rgba(255,255,255,0.12);border:none;cursor:pointer;
+                   width:40px;height:40px;border-radius:50%;
+                   display:flex;align-items:center;justify-content:center;
+                   color:#fff;transition:background 0.15s;z-index:10000;"
+            onmouseover="this.style.background='rgba(255,255,255,0.22)'"
+            onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+        <i data-lucide="x" style="width:18px;height:18px;"></i>
+    </button>
+
+    <!-- Video — 16:9, up to 88vw wide -->
+    <div style="width:min(88vw,1400px);position:relative;">
+        <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px;box-shadow:0 24px 80px rgba(0,0,0,0.6);">
+            <iframe id="lightbox-iframe"
+                    src=""
+                    style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    allowfullscreen>
+            </iframe>
+        </div>
+        <p style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.75rem;margin-top:12px;font-family:'DM Sans',sans-serif;">
+            Press <kbd style="background:rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;">Esc</kbd> to close
+        </p>
+    </div>
+</div>
+
 {% endblock %}

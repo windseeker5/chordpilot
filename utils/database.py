@@ -82,6 +82,20 @@ def init_db():
         )
     ''')
 
+    # Tutorials table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tutorials (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            title       TEXT NOT NULL,
+            song_hint   TEXT,
+            url         TEXT NOT NULL,
+            thumbnail   TEXT,
+            channel     TEXT,
+            description TEXT,
+            date_added  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("✓ Database initialized")
@@ -390,6 +404,47 @@ def add_notification(user_id: int, message: str):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('INSERT INTO notifications (user_id, message) VALUES (?, ?)', (user_id, message))
+    conn.commit()
+    conn.close()
+
+
+# ─────────────────────────────────────────────
+# TUTORIALS
+# ─────────────────────────────────────────────
+
+def get_tutorials(limit: int = None) -> List[Dict]:
+    """Get tutorials, newest first."""
+    conn = get_db()
+    cursor = conn.cursor()
+    sql = 'SELECT * FROM tutorials ORDER BY date_added DESC'
+    if limit:
+        sql += f' LIMIT {int(limit)}'
+    cursor.execute(sql)
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def add_tutorial(title: str, url: str, thumbnail: str = None, channel: str = None,
+                 description: str = None, song_hint: str = None) -> int:
+    """Add a tutorial. Returns new id."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO tutorials (title, url, thumbnail, channel, description, song_hint)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (title, url, thumbnail, channel, description, song_hint))
+    new_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return new_id
+
+
+def delete_tutorial(tutorial_id: int):
+    """Delete a tutorial by id."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM tutorials WHERE id = ?', (tutorial_id,))
     conn.commit()
     conn.close()
 

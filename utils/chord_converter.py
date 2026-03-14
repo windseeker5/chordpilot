@@ -255,8 +255,19 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
     if title or artist or key:
         chordpro_lines.append('')  # Blank line after headers
 
+    # Tab line pattern: e|---, E|---, B|---, G|---, D|---, A|---, or sequences of -|0-9phb/\
+    _TAB_LINE_RE = re.compile(r'^[eEBGDAd]\|', re.IGNORECASE)
+
+    def _looks_like_tab_section(lookahead_lines):
+        """Return True if any of the upcoming lines look like ASCII tab."""
+        for l in lookahead_lines:
+            if _TAB_LINE_RE.match(l.lstrip()):
+                return True
+        return False
+
     # Process the chord/lyric content
     in_section = None
+    is_tab_section = False
     chord_line = None
     i = 0
 
@@ -271,14 +282,30 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
                 chordpro_lines.append(f'{{end_of_{in_section}}}')
                 chordpro_lines.append('')  # Blank line between sections
 
-            # Start new section
+            # For intro sections, look ahead to detect ASCII tab content
+            if section_type == 'intro':
+                lookahead = lines[i + 1:i + 10]
+                if _looks_like_tab_section(lookahead):
+                    in_section = 'tab'
+                    is_tab_section = True
+                    chordpro_lines.append('{start_of_tab: Intro}')
+                    i += 1
+                    continue
+
             in_section = section_type
+            is_tab_section = False
             chordpro_lines.append(f'{{start_of_{section_type}}}')
             i += 1
             continue
 
         # Unknown [Label] line (e.g. [Instrumental], [Solo]) — skip it
         if re.fullmatch(r'\[[^\]]+\]', line.strip()):
+            i += 1
+            continue
+
+        # Tab sections: pass lines through verbatim (no chord/lyric processing)
+        if is_tab_section:
+            chordpro_lines.append(line.rstrip())
             i += 1
             continue
 

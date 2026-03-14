@@ -7,6 +7,7 @@ Multi-source chord fetching: Songsterr → Ultimate Guitar → Ollama AI → Man
 import os
 import re
 import json
+import time
 import subprocess
 import threading
 import hashlib
@@ -22,6 +23,9 @@ from utils.artist_lookup import get_song_metadata, parse_search_query
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'guitar-practice-app-secret-key'
 
+from urllib.parse import quote as _url_quote
+app.jinja_env.filters['urlencode'] = lambda s: _url_quote(str(s or ''), safe='')
+
 # Git version: short commit hash (7 chars)
 def _get_git_version():
     try:
@@ -34,6 +38,128 @@ def _get_git_version():
         return 'dev'
 
 GIT_VERSION = _get_git_version()
+
+# ─────────────────────────────────────────────
+# CHARTS CACHE  (TTL 1 hour each)
+# ─────────────────────────────────────────────
+_global_chart_cache  = {'data': None, 'ts': 0}
+_guitar_chart_cache  = {'data': None, 'ts': 0}
+
+import urllib.request as _urllib_req
+
+
+def _http_get(url, timeout=6, extra_headers=None):
+    """Simple GET helper with JSON decode."""
+    headers = {'User-Agent': 'ChordPilot/1.0 (guitar practice app)'}
+    if extra_headers:
+        headers.update(extra_headers)
+    req = _urllib_req.Request(url, headers=headers)
+    with _urllib_req.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode())
+
+
+def fetch_global_chart(limit: int = 10):
+    """
+    Top tracks from Deezer Chart API — free, no auth, real streaming data.
+    Endpoint: https://api.deezer.com/chart/0/tracks
+    Returns rank, title, artist, genre, Deezer rank-score (popularity metric), link.
+    Cached 1 hour.
+    """
+    global _global_chart_cache
+    now = time.time()
+    if _global_chart_cache['data'] and (now - _global_chart_cache['ts']) < 3600:
+        return _global_chart_cache['data'][:limit]
+    try:
+        payload = _http_get(f'https://api.deezer.com/chart/0/tracks?limit={limit}')
+        items = payload.get('data', [])
+        result = []
+        for i, item in enumerate(items):
+            # Deezer 'rank' is a popularity score (higher = more popular)
+            score = item.get('rank', 0)
+            score_fmt = f"{score:,}" if score >= 1000 else str(score)
+            result.append({
+                'rank':    i + 1,
+                'title':   item.get('title_short') or item.get('title', ''),
+                'artist':  item.get('artist', {}).get('name', ''),
+                'image':   item.get('album', {}).get('cover_medium', ''),
+                'link':    item.get('link', ''),
+                'score':   score_fmt,
+                'source':  'Deezer Charts',
+            })
+        if result:
+            _global_chart_cache = {'data': result, 'ts': now}
+            print(f"[CHART] Loaded {len(result)} global tracks from Deezer")
+            return result[:limit]
+    except Exception as e:
+        print(f"[CHART] Deezer fetch failed: {e}")
+    return []   # empty → template shows "unavailable" state
+
+
+def fetch_guitar_chart(limit: int = 6):
+    """
+    Scrape Ultimate Guitar daily top tabs from the public /top/tabs page.
+    UG embeds all page data as JSON inside <div class="js-store" data-content="...">.
+    No API key needed. Returns top tabs sorted by daily hits.
+    Cached 1 hour.
+    """
+    global _guitar_chart_cache
+    now = time.time()
+    if _guitar_chart_cache['data'] and (now - _guitar_chart_cache['ts']) < 3600:
+        return _guitar_chart_cache['data'][:limit]
+    try:
+        import html as _html
+        import re as _re
+        url = 'https://www.ultimate-guitar.com/top/tabs?period=daily'
+        req = _urllib_req.Request(url, headers={
+            'User-Agent': (
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            ),
+            'Accept':          'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'identity',
+        })
+        with _urllib_req.urlopen(req, timeout=10) as resp:
+            page_html = resp.read().decode('utf-8')
+
+        # UG injects all data into: <div class="js-store" data-content="...JSON...">
+        m = _re.search(r'class="js-store"[^>]*data-content="([^"]*)"', page_html)
+        if not m:
+            raise ValueError("js-store element not found in page")
+
+        data      = json.loads(_html.unescape(m.group(1)))
+        page_data = data.get('store', {}).get('page', {}).get('data', {})
+        tabs      = page_data.get('tabs', [])
+
+        # Hits are stored separately: [{id, hits}, ...] — join by tab id
+        hits_lookup = {h['id']: h['hits'] for h in page_data.get('hits', [])}
+
+        result = []
+        for i, tab in enumerate(tabs[:limit]):
+            hits = hits_lookup.get(tab.get('id', 0), 0)
+            image = (
+                tab.get('album_cover', {})
+                   .get('web_album_cover', {})
+                   .get('small', '')
+            )
+            result.append({
+                'rank':     i + 1,
+                'title':    tab.get('song_name', ''),
+                'artist':   tab.get('artist_name', ''),
+                'hits':     f"{hits:,}" if hits >= 1000 else str(hits),
+                'tab_type': tab.get('type_name') or tab.get('type', 'Chords'),
+                'tab_url':  tab.get('tab_url', ''),
+                'image':    image,
+                'source':   'Ultimate Guitar',
+            })
+
+        if result:
+            _guitar_chart_cache = {'data': result, 'ts': now}
+            print(f"[CHART] Loaded {len(result)} guitar tabs from UG /top/tabs daily")
+            return result[:limit]
+    except Exception as e:
+        print(f"[CHART] UG scrape failed: {e}")
+    return []
 
 
 # ─────────────────────────────────────────────
@@ -117,7 +243,17 @@ def home_page():
     songs = get_all_songs()
     total_plays = sum((s.get('play_count') or 0) for s in songs)
     practiced_count = sum(1 for s in songs if (s.get('play_count') or 0) > 0)
-    return render_template('home.html', songs=songs,
+    # Top 6 songs by play_count
+    top_songs = sorted(songs, key=lambda s: (s.get('play_count') or 0), reverse=True)[:6]
+    tutorials = db.get_tutorials(limit=6)
+    global_chart = fetch_global_chart(limit=6)
+    guitar_chart = fetch_guitar_chart(limit=6)
+    from datetime import datetime
+    fetched_at = datetime.now().strftime('%H:%M')
+    return render_template('home.html', songs=songs, top_songs=top_songs,
+                           tutorials=tutorials,
+                           global_chart=global_chart, guitar_chart=guitar_chart,
+                           fetched_at=fetched_at,
                            total_plays=total_plays, practiced_count=practiced_count)
 
 
@@ -387,6 +523,57 @@ def library_delete_song(song_id):
     db.delete_song(song_id)
 
     return jsonify({'success': True, 'message': 'Song deleted'})
+
+
+@app.route('/library/update-song-info/<song_id>', methods=['POST'])
+@login_required
+def library_update_song_info(song_id):
+    """Update a song's title, artist, and key"""
+    song = get_song_by_id(song_id)
+    if not song:
+        return jsonify({'error': 'Song not found'}), 404
+
+    data = request.get_json() or {}
+    title = data.get('title', '').strip()
+    artist = data.get('artist', '').strip()
+    key = data.get('key', '').strip()
+
+    updates = {}
+    if title:
+        updates['title'] = title
+    if 'artist' in data:
+        updates['artist'] = artist
+    if 'key' in data:
+        updates['key'] = key
+
+    if updates:
+        db.update_song(song_id, updates)
+
+    # Update .cho file headers if it exists
+    cho_path = os.path.join(SONGS_DIR, song['folder'], 'chords.cho')
+    if os.path.exists(cho_path):
+        with open(cho_path, 'r') as f:
+            content = f.read()
+        if title:
+            if re.search(r'^\{title:[^}]*\}', content, re.MULTILINE):
+                content = re.sub(r'^\{title:[^}]*\}', f'{{title: {title}}}', content, flags=re.MULTILINE)
+            else:
+                content = f'{{title: {title}}}\n' + content
+        if 'artist' in data:
+            if re.search(r'^\{artist:[^}]*\}', content, re.MULTILINE):
+                content = re.sub(r'^\{artist:[^}]*\}', f'{{artist: {artist}}}', content, flags=re.MULTILINE)
+            else:
+                content = f'{{artist: {artist}}}\n' + content
+        if 'key' in data:
+            if key:
+                if re.search(r'^\{key:[^}]*\}', content, re.MULTILINE):
+                    content = re.sub(r'^\{key:[^}]*\}', f'{{key: {key}}}', content, flags=re.MULTILINE)
+                else:
+                    content = f'{{key: {key}}}\n' + content
+        with open(cho_path, 'w') as f:
+            f.write(content)
+
+    return jsonify({'success': True})
 
 
 @app.route('/library/download-status/<song_id>')
@@ -806,6 +993,56 @@ def api_mark_notifications_read():
     user_id = session.get('user_id')
     if user_id:
         db.mark_notifications_read(user_id)
+    return jsonify({'success': True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TUTORIALS API
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/tutorials')
+@login_required
+def api_get_tutorials():
+    """Return all tutorials as JSON."""
+    tutorials = db.get_tutorials()
+    return jsonify(tutorials)
+
+
+@app.route('/api/tutorials/add', methods=['POST'])
+@login_required
+def api_add_tutorial():
+    """Add a tutorial — auto-fetches YT metadata via get_video_info."""
+    from utils.youtube_downloader import get_video_info
+    data = request.get_json() or {}
+    url = (data.get('url') or '').strip()
+    song_hint = (data.get('song_hint') or '').strip()
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    info = get_video_info(url)
+    if info:
+        title = info.get('title') or url
+        thumbnail = info.get('thumbnail') or ''
+        channel = info.get('channel') or ''
+        description = info.get('description') or ''
+    else:
+        # Fallback: use url as title if yt-dlp can't resolve it
+        title = url
+        thumbnail = channel = description = ''
+
+    tutorial_id = db.add_tutorial(
+        title=title, url=url, thumbnail=thumbnail,
+        channel=channel, description=description, song_hint=song_hint
+    )
+    return jsonify({'success': True, 'id': tutorial_id, 'title': title,
+                    'thumbnail': thumbnail, 'channel': channel})
+
+
+@app.route('/api/tutorials/<int:tutorial_id>', methods=['DELETE'])
+@login_required
+def api_delete_tutorial(tutorial_id):
+    """Delete a tutorial."""
+    db.delete_tutorial(tutorial_id)
     return jsonify({'success': True})
 
 
