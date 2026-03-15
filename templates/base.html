@@ -13,30 +13,99 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
+        /* ── Brand color: amber primary (harmonizes with orange header) ── */
+        /* DaisyUI 4 oklch override: amber-600 ≈ oklch(0.666 0.179 58) */
+        :root,
+        [data-theme="light"] { --p: 0.666 0.179 58; --pf: 0.554 0.152 59; }
+
         /* ── Layout ── */
-        html, body { background: #ffffff !important; font-size: 14px; }
+        html, body { background: #f9fafb !important; font-size: 14px; }
         [data-theme="dark"] html,
         [data-theme="dark"] body { background: oklch(var(--b1)) !important; }
 
-        .sidebar {
-            width: 220px;
-            height: 100vh;
+        /* ── Global Header ── */
+        .global-header {
+            height: 60px;
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            padding: 0 20px;
+            gap: 16px;
             position: sticky;
             top: 0;
+            z-index: 50;
+            flex-shrink: 0;
+        }
+        .header-left   { display: flex; align-items: center; gap: 12px; }
+        .header-center { display: flex; justify-content: center; align-items: center; min-width: 0; width: 100%; }
+        .header-center > * { width: 100%; }
+        .header-right  { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+
+        /* Mobile hamburger: hidden on desktop */
+        .mobile-hamburger { display: none; }
+        @media (max-width: 1023px) {
+            .mobile-hamburger {
+                display: flex;
+                align-items: center;
+                background: rgba(255,255,255,0.2);
+                border: none;
+                cursor: pointer;
+                padding: 6px;
+                border-radius: 6px;
+                color: #fff;
+            }
+        }
+
+        /* ── Search input in header ── */
+        .global-search {
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+        }
+        .global-search input {
+            width: 100%;
+            height: 34px;
+            background: rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 8px;
+            padding: 0 16px 0 34px;
+            font-size: 13px;
+            color: #ffffff;
+            outline: none;
+            transition: background 0.15s;
+        }
+        .global-search input::placeholder { color: rgba(255, 255, 255, 0.7); }
+        .global-search input:focus { background: rgba(255, 255, 255, 0.35); }
+        .global-search .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            pointer-events: none;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 220px;
+            height: calc(100vh - 60px);
+            position: sticky;
+            top: 60px;
             align-self: flex-start;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             background: #ffffff;
-            border-right: none;
+            border-right: 1px solid #e5e7eb;
             box-shadow: none;
             flex-shrink: 0;
         }
 
         /* Light theme */
-        [data-theme="light"] .sidebar { background: #ffffff; }
+        [data-theme="light"] .sidebar { background: #ffffff; border-right-color: transparent; }
         /* Dark theme */
-        [data-theme="dark"]  .sidebar { background: oklch(var(--b2)); }
+        [data-theme="dark"]  .sidebar { background: oklch(var(--b2)); border-right-color: transparent; }
 
         /* ── Nav items ── */
         .nav-item {
@@ -53,39 +122,12 @@
             margin-bottom: 1px;
         }
         .nav-item:hover { background: #f5f5f5; }
-        .nav-item.active { background: transparent; color: #3b82f6; font-weight: 500; }
+        .nav-item.active { background: transparent; color: #d97706; font-weight: 500; }
         .nav-item.active::before { display: none; }
         .nav-item svg { flex-shrink: 0; opacity: 0.7; }
         .nav-item.active svg { opacity: 1; }
         [data-theme="dark"] .nav-item:hover { background: oklch(var(--b3)/0.5); }
         [data-theme="dark"] .nav-item.active { color: oklch(var(--p)); }
-
-        /* ── Topbar ── */
-        .topbar {
-            height: 48px;
-            background: #ffffff;
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            gap: 8px;
-            position: sticky;
-            top: 0;
-            z-index: 40;
-            border-bottom: 1px solid var(--topbar-border, #f1f5f9);
-        }
-        [data-theme="dark"] .topbar { background: oklch(var(--b1)); border-bottom-color: oklch(var(--b3)); }
-
-        /* ── Logo area ── */
-        .sidebar-logo {
-            padding: 16px 14px 12px;
-        }
-        .sidebar-logo img { height: 26px; }
-
-        /* Logo theme switching */
-        .logo-light { display: block; }
-        .logo-dark  { display: none; }
-        [data-theme="dark"] .logo-light { display: none; }
-        [data-theme="dark"] .logo-dark  { display: block; }
 
         /* ── Nav section label ── */
         .nav-section-label {
@@ -111,7 +153,7 @@
         }
 
         /* ── Content ── */
-        .page-main { flex: 1; background: #ffffff; overflow-y: auto; }
+        .page-main { flex: 1; background: #f9fafb; overflow-y: auto; }
         [data-theme="dark"] .page-main { background: oklch(var(--b1)); }
 
         /* ── ChordPro rendering ── */
@@ -227,7 +269,7 @@
         }
         .cp-btn:hover:not(:disabled) { filter: brightness(0.92); }
         .cp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .cp-btn-primary   { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+        .cp-btn-primary   { background:#d97706; color:#fff; border-color:#d97706; }
         .cp-btn-secondary { background:#64748b; color:#fff; border-color:#64748b; }
         .cp-btn-ghost     { background:transparent; color:#374151; border-color:#d1d5db; }
         .cp-btn-ghost:hover { filter:none; background:#f3f4f6; }
@@ -245,7 +287,7 @@
     {% block extra_styles %}{% endblock %}
 </head>
 
-<body class="text-base-content" style="background:#ffffff">
+<body class="text-base-content" style="background:#f9fafb">
 
 <!-- Apply saved theme immediately (before paint) -->
 <script>
@@ -256,168 +298,177 @@
 </script>
 
 <!-- ══════════════════════════════════════════
-     OUTER WRAPPER: sidebar + main side by side
+     OUTER WRAPPER: column layout
 ═══════════════════════════════════════════════ -->
-<div class="flex min-h-screen">
+<div class="flex flex-col min-h-screen">
 
-    <!-- ── SIDEBAR ───────────────────────────── -->
-    <aside class="sidebar hidden lg:flex flex-col">
+    <!-- ── GLOBAL HEADER ──────────────────────── -->
+    <header class="global-header">
 
-        <!-- Logo -->
-        <div class="sidebar-logo">
-            <a href="/">
-                <img src="{{ url_for('static', filename='images/chordpilot-logo-black.png') }}"
-                     alt="ChordPilot" class="logo-light" />
+        <!-- Left: hamburger (mobile) + logo -->
+        <div class="header-left">
+            <button class="mobile-hamburger" onclick="toggleMobileSidebar()">
+                <i data-lucide="menu" style="width:18px;height:18px;"></i>
+            </button>
+            <a href="/" style="display:flex;align-items:center;">
                 <img src="{{ url_for('static', filename='images/chordpilot-logo-white.png') }}"
-                     alt="ChordPilot" class="logo-dark" />
+                     alt="ChordPilot" style="height:16px;" />
             </a>
         </div>
 
-        <!-- Nav -->
-        <nav class="flex-1 px-3 pt-3 overflow-y-auto">
-
-            <a href="/"
-               class="nav-item {% if request.endpoint == 'home_page' %}active{% endif %}">
-                <i data-lucide="home" class="w-4 h-4"></i>
-                Home
-            </a>
-
-            <a href="/library"
-               class="nav-item {% if request.endpoint == 'library_page' %}active{% endif %}">
-                <i data-lucide="library" class="w-4 h-4"></i>
-                Library
-            </a>
-
-            <a href="/tuner"
-               class="nav-item {% if request.endpoint == 'tuner_page' %}active{% endif %}">
-                <i data-lucide="music" class="w-4 h-4"></i>
-                Tuner
-            </a>
-
-            <a href="/settings"
-               class="nav-item {% if request.endpoint == 'settings_page' %}active{% endif %}">
-                <i data-lucide="settings" class="w-4 h-4"></i>
-                Settings
-            </a>
-
-            <a href="/logout" class="nav-item" style="color:oklch(var(--er)/0.7);"
-               onmouseover="this.style.color='oklch(var(--er))'"
-               onmouseout="this.style.color='oklch(var(--er)/0.7)'">
-                <i data-lucide="log-out" class="w-4 h-4"></i>
-                Log out
-            </a>
-        </nav>
-
-        <!-- Footer version -->
-        <div class="px-3 py-3">
-            <span class="text-xs text-base-content/30 select-none">ChordPilot v{{ git_version }}</span>
+        <!-- Center: search (default) or player controls (overridden by player.html) -->
+        <div class="header-center">
+            {% block header_center %}
+            <div class="global-search">
+                <i data-lucide="search" class="search-icon" style="width:14px;height:14px;"></i>
+                <input type="text" placeholder="Search songs or artists…" />
+            </div>
+            {% endblock %}
         </div>
-    </aside>
 
-    <!-- ── RIGHT SIDE: topbar + content ──────── -->
-    <div class="flex flex-col flex-1 min-w-0">
+        <!-- Right controls -->
+        <div class="header-right">
 
-        <!-- TOPBAR -->
-        <header class="topbar">
-            <!-- Mobile hamburger -->
-            <button class="cp-btn cp-btn-ghost cp-btn-icon lg:hidden" onclick="toggleMobileSidebar()">
-                <i data-lucide="menu" class="w-4 h-4"></i>
+            <!-- Theme toggle -->
+            <button id="theme-btn" title="Toggle theme"
+                    style="background:rgba(255,255,255,0.2);border:none;cursor:pointer;padding:6px;display:flex;align-items:center;color:#fff;border-radius:6px;"
+                    onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                    onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                <i data-lucide="sun"  style="width:18px;height:18px;display:none;" id="icon-sun"></i>
+                <i data-lucide="moon" style="width:18px;height:18px;display:none;" id="icon-moon"></i>
             </button>
 
-            <!-- Page breadcrumb / title -->
-            <div class="flex-1 text-sm font-medium text-base-content/60">
-                {% block page_title %}{% endblock %}
-            </div>
-
-            <!-- Right controls -->
-            <div class="flex items-center gap-1">
-
-                {% block nav_buttons %}{% endblock %}
-
-                <!-- Theme toggle -->
-                <button id="theme-btn" title="Toggle theme"
-                        style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;color:oklch(var(--bc)/0.5);border-radius:4px;"
-                        onmouseover="this.style.color='oklch(var(--bc))'"
-                        onmouseout="this.style.color='oklch(var(--bc)/0.5)'">
-                    <i data-lucide="sun"  style="width:18px;height:18px;display:none;" id="icon-sun"></i>
-                    <i data-lucide="moon" style="width:18px;height:18px;display:none;" id="icon-moon"></i>
+            <!-- User avatar with Gravatar + notification dot -->
+            {% if current_user %}
+            <div class="dropdown dropdown-end">
+                <!-- Trigger button -->
+                <button tabindex="0"
+                        onclick="loadNotifications()"
+                        style="position:relative;width:34px;height:34px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,0.5);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                    <!-- Gravatar -->
+                    <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;">
+                        <img src="{{ gravatar_url }}"
+                             alt="{{ current_user.username[0].upper() }}"
+                             style="width:100%;height:100%;object-fit:cover;border-radius:50%;"
+                             onerror="this.style.display='none';" />
+                    </div>
+                    <!-- Notification dot -->
+                    <span id="notif-dot"
+                          style="position:absolute;top:0px;right:0px;width:9px;height:9px;border-radius:50%;background:#ef4444;border:2px solid white;display:{% if unread_count > 0 %}block{% else %}none{% endif %};"></span>
                 </button>
 
-                <!-- User avatar with Gravatar + notification dot -->
-                {% if current_user %}
-                <div class="dropdown dropdown-end">
-                    <!-- Trigger button -->
-                    <button tabindex="0"
-                            onclick="loadNotifications()"
-                            style="position:relative;width:34px;height:34px;padding:0;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;">
-                        <!-- Gravatar -->
-                        <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;ring:1px solid oklch(var(--b3));">
-                            <img src="{{ gravatar_url }}"
-                                 alt="{{ current_user.username[0].upper() }}"
-                                 style="width:100%;height:100%;object-fit:cover;border-radius:50%;"
-                                 onerror="this.style.display='none';" />
+                <!-- Dropdown panel -->
+                <div tabindex="0"
+                     class="dropdown-content z-50 shadow-xl bg-base-100 border border-base-300"
+                     style="border-radius:10px;width:270px;margin-top:8px;overflow:hidden;">
+
+                    <!-- User header -->
+                    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid oklch(var(--b3));">
+                        <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;">
+                            <img src="{{ gravatar_url }}" alt="" style="width:100%;height:100%;object-fit:cover;" />
                         </div>
-                        <!-- Notification dot -->
-                        <span id="notif-dot"
-                              style="position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ef4444;border:2px solid white;display:{% if unread_count > 0 %}block{% else %}none{% endif %};"></span>
-                    </button>
-
-                    <!-- Dropdown panel -->
-                    <div tabindex="0"
-                         class="dropdown-content z-50 shadow-xl bg-base-100 border border-base-300"
-                         style="border-radius:10px;width:270px;margin-top:8px;overflow:hidden;">
-
-                        <!-- User header -->
-                        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid oklch(var(--b3));">
-                            <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;">
-                                <img src="{{ gravatar_url }}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+                        <div style="min-width:0;">
+                            <div style="font-weight:600;font-size:0.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ current_user.username }}
                             </div>
-                            <div style="min-width:0;">
-                                <div style="font-weight:600;font-size:0.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                    {{ current_user.username }}
-                                </div>
-                                <div style="font-size:0.6875rem;color:oklch(var(--bc)/0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                    {{ current_user.email if current_user.email else '' }}
-                                </div>
+                            <div style="font-size:0.6875rem;color:oklch(var(--bc)/0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ current_user.email if current_user.email else '' }}
                             </div>
-                        </div>
-
-                        <!-- Notifications section -->
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid oklch(var(--b3));">
-                            <span style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:oklch(var(--bc)/0.5);">
-                                Notifications
-                            </span>
-                            <button onclick="markAllRead()"
-                                    style="font-size:0.6875rem;color:oklch(var(--bc)/0.4);background:none;border:none;cursor:pointer;padding:0;"
-                                    onmouseover="this.style.color='oklch(var(--bc))'"
-                                    onmouseout="this.style.color='oklch(var(--bc)/0.4)'">
-                                Mark all read
-                            </button>
-                        </div>
-                        <ul id="notif-list" style="max-height:180px;overflow-y:auto;padding:4px 0;margin:0;list-style:none;">
-                            <li style="padding:8px 14px;font-size:0.75rem;color:oklch(var(--bc)/0.4);">Loading…</li>
-                        </ul>
-
-                        <!-- Logout -->
-                        <div style="border-top:1px solid oklch(var(--b3));padding:4px;">
-                            <a href="/logout"
-                               style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:0.875rem;color:oklch(var(--er)/0.8);text-decoration:none;transition:background 0.1s;"
-                               onmouseover="this.style.background='oklch(var(--b2))'"
-                               onmouseout="this.style.background='transparent'">
-                                <i data-lucide="log-out" style="width:14px;height:14px;"></i>
-                                Log out
-                            </a>
                         </div>
                     </div>
-                </div>
-                {% endif %}
-            </div>
-        </header>
 
-        <!-- PAGE CONTENT -->
-        <main class="page-main p-5 lg:p-6">
-            {% block content %}{% endblock %}
-        </main>
+                    <!-- Notifications section -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid oklch(var(--b3));">
+                        <span style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:oklch(var(--bc)/0.5);">
+                            Notifications
+                        </span>
+                        <button onclick="markAllRead()"
+                                style="font-size:0.6875rem;color:oklch(var(--bc)/0.4);background:none;border:none;cursor:pointer;padding:0;"
+                                onmouseover="this.style.color='oklch(var(--bc))'"
+                                onmouseout="this.style.color='oklch(var(--bc)/0.4)'">
+                            Mark all read
+                        </button>
+                    </div>
+                    <ul id="notif-list" style="max-height:180px;overflow-y:auto;padding:4px 0;margin:0;list-style:none;">
+                        <li style="padding:8px 14px;font-size:0.75rem;color:oklch(var(--bc)/0.4);">Loading…</li>
+                    </ul>
+
+                    <!-- Logout -->
+                    <div style="border-top:1px solid oklch(var(--b3));padding:4px;">
+                        <a href="/logout"
+                           style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:0.875rem;color:oklch(var(--er)/0.8);text-decoration:none;transition:background 0.1s;"
+                           onmouseover="this.style.background='oklch(var(--b2))'"
+                           onmouseout="this.style.background='transparent'">
+                            <i data-lucide="log-out" style="width:14px;height:14px;"></i>
+                            Log out
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ── INNER ROW: sidebar + content ──────── -->
+    <div class="flex flex-1 min-h-0">
+
+        <!-- ── SIDEBAR ───────────────────────────── -->
+        <aside class="sidebar hidden lg:flex flex-col">
+
+            <!-- Nav -->
+            <nav class="flex-1 px-3 pt-3 overflow-y-auto">
+
+                <a href="/"
+                   class="nav-item {% if request.endpoint == 'home_page' %}active{% endif %}">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                    Home
+                </a>
+
+                <a href="/library"
+                   class="nav-item {% if request.endpoint == 'library_page' %}active{% endif %}">
+                    <i data-lucide="library" class="w-4 h-4"></i>
+                    Library
+                </a>
+
+                <a href="/tuner"
+                   class="nav-item {% if request.endpoint == 'tuner_page' %}active{% endif %}">
+                    <i data-lucide="music" class="w-4 h-4"></i>
+                    Tuner
+                </a>
+
+                <a href="/settings"
+                   class="nav-item {% if request.endpoint == 'settings_page' %}active{% endif %}">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    Settings
+                </a>
+
+                <a href="/logout" class="nav-item" style="color:oklch(var(--er)/0.7);"
+                   onmouseover="this.style.color='oklch(var(--er))'"
+                   onmouseout="this.style.color='oklch(var(--er)/0.7)'">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    Log out
+                </a>
+            </nav>
+
+            <!-- Footer version -->
+            <div class="px-3 py-3">
+                <span class="text-xs text-base-content/30 select-none">ChordPilot v{{ git_version }}</span>
+            </div>
+        </aside>
+
+        <!-- ── RIGHT SIDE: content + footer ──────── -->
+        <div class="flex flex-col flex-1 min-w-0">
+
+            <!-- PAGE CONTENT -->
+            <main class="page-main p-5 lg:p-6">
+                {% block content %}{% endblock %}
+            </main>
+
+            <!-- FOOTER -->
+            <footer style="padding:20px 24px 20px;flex-shrink:0;">
+                <p style="font-size:0.68rem;color:#cbd5e1;text-align:center;user-select:none;letter-spacing:0.03em;">&copy; 2026 ChordPilot</p>
+            </footer>
+        </div>
     </div>
 </div>
 
@@ -426,13 +477,11 @@
      class="fixed inset-0 z-50 hidden"
      onclick="toggleMobileSidebar()">
     <div class="absolute inset-0 bg-black/30"></div>
-    <aside class="sidebar absolute left-0 top-0 h-full shadow-xl flex flex-col">
-        <div class="sidebar-logo flex items-center justify-between pr-3">
+    <aside class="sidebar absolute left-0 top-0 h-full shadow-xl flex flex-col" style="height:100vh;top:0;">
+        <div style="padding:16px 14px 12px;display:flex;align-items:center;justify-content:space-between;">
             <a href="/">
                 <img src="{{ url_for('static', filename='images/chordpilot-logo-black.png') }}"
-                     alt="ChordPilot" class="logo-light" />
-                <img src="{{ url_for('static', filename='images/chordpilot-logo-white.png') }}"
-                     alt="ChordPilot" class="logo-dark" />
+                     alt="ChordPilot" style="height:20px;" />
             </a>
             <button class="cp-btn cp-btn-ghost cp-btn-icon" onclick="toggleMobileSidebar()">
                 <i data-lucide="x" class="w-4 h-4"></i>

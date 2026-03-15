@@ -243,8 +243,8 @@ def home_page():
     songs = get_all_songs()
     total_plays = sum((s.get('play_count') or 0) for s in songs)
     practiced_count = sum(1 for s in songs if (s.get('play_count') or 0) > 0)
-    # Top 6 songs by play_count
-    top_songs = sorted(songs, key=lambda s: (s.get('play_count') or 0), reverse=True)[:6]
+    # Top 8 songs by play_count
+    top_songs = sorted(songs, key=lambda s: (s.get('play_count') or 0), reverse=True)[:8]
     tutorials = db.get_tutorials(limit=6)
     global_chart = fetch_global_chart(limit=6)
     guitar_chart = fetch_guitar_chart(limit=6)

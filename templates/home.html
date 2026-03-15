@@ -30,7 +30,7 @@
     }
     [data-theme="dark"] .cp-h1 { color: #e2e8f0 !important; }
 
-    body, .home-wrap { font-family: 'DM Sans', sans-serif; background: #fff; }
+    body, .home-wrap { font-family: 'DM Sans', sans-serif; }
 
     /* ── Eyebrow label above each section ── */
     .eyebrow {
@@ -200,25 +200,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto" style="background:#fff;">
+<div class="max-w-7xl mx-auto">
 
     <!-- ══════════════════════════════════════════════
          HEADER — welcome + stats (search is in topbar)
     ══════════════════════════════════════════════ -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:2.5rem;">
-        <div>
-            <div class="eyebrow">Guitar Practice</div>
-            <h1 class="cp-h1">
-                {% if current_user %}Welcome back,<br>
-                <span style="color:#3b82f6;">{{ current_user.username }}</span>
-                {% else %}My Practice{% endif %}
-            </h1>
-        </div>
-        <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end;">
-            <div class="stat-pill"><i data-lucide="music-2" style="width:12px;height:12px;"></i>{{ songs|length }} songs</div>
-            <div class="stat-pill"><i data-lucide="play" style="width:12px;height:12px;"></i>{{ total_plays }} plays</div>
-            <div class="stat-pill"><i data-lucide="check-circle" style="width:12px;height:12px;"></i>{{ practiced_count }} practiced</div>
-        </div>
+    <div style="margin-bottom:2.5rem;">
+        <h1 class="cp-h1">
+            {% if current_user %}Welcome back, <span style="color:#d97706;">{{ current_user.username }}</span>
+            {% else %}My Practice{% endif %}
+        </h1>
     </div>
 
     <!-- ══════════════════════════════════════════════
@@ -236,11 +227,11 @@
         </div>
 
         {% if songs %}
-        {% set bar_colors = ['#3b82f6,#6366f1','#8b5cf6,#ec4899','#10b981,#06b6d4','#f59e0b,#ef4444','#3b82f6,#10b981','#ec4899,#f97316'] %}
-        {% set icon_bg   = ['#eff6ff','#f5f3ff','#ecfdf5','#fffbeb','#eff6ff','#fdf2f8'] %}
-        {% set icon_col  = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#3b82f6','#ec4899'] %}
+        {% set bar_colors = ['#3b82f6,#6366f1','#8b5cf6,#ec4899','#10b981,#06b6d4','#f59e0b,#ef4444','#3b82f6,#10b981','#ec4899,#f97316','#14b8a6,#3b82f6','#f97316,#f59e0b'] %}
+        {% set icon_bg   = ['#eff6ff','#f5f3ff','#ecfdf5','#fffbeb','#eff6ff','#fdf2f8','#f0fdfa','#fff7ed'] %}
+        {% set icon_col  = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#3b82f6','#ec4899','#14b8a6','#f97316'] %}
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" id="home-song-grid">
+        <div class="grid grid-cols-2 xl:grid-cols-4 gap-3" id="home-song-grid">
             {% for song in top_songs %}
             {% set ci = loop.index0 % 6 %}
             <a href="/song/{{ song.song_id }}" class="pcard song-card"

@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 
 {% block title %}{{ song.title }} — ChordPilot{% endblock %}
-{% block page_title %}{{ song.title }}{% endblock %}
 
 {% block extra_styles %}
 <style>
@@ -34,7 +33,7 @@
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    padding: 2px 0 8px;
     scrollbar-width: thin;
 }
 /* ── Dark mode fallbacks ── */
@@ -73,167 +72,121 @@
     overflow-y: visible !important;
 }
 
-/* Sticky player card zone — sits below topbar (48px) */
-.player-sticky {
-    position: sticky;
-    top: 48px;
-    z-index: 30;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid #e2e8f0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
-    margin-left: -1.25rem;
-    margin-right: -1.25rem;
-    padding: 8px 1.25rem;
-    margin-bottom: 16px;
-}
-@media (min-width: 1024px) {
-    .player-sticky { margin-left: -1.5rem; margin-right: -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; }
-}
-[data-theme="dark"] .player-sticky {
-    background: oklch(var(--b1) / 0.92);
-    border-bottom-color: oklch(var(--b3));
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-}
-/* Strip the card chrome — it's inside the sticky zone now */
-.player-sticky .player-card,
-[data-theme="light"] .player-sticky .player-card {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-.player-sticky .card-body { padding: 0; }
+/* Player page: taller global header to fit artist + title + controls */
+.global-header { height: 88px; }
+.sidebar { top: 88px !important; height: calc(100vh - 88px) !important; }
 
-/* Sticky chord diagrams zone — top set dynamically by JS */
+/* Text in the gradient header should be white */
+.header-center .text-base-content { color: rgba(255,255,255,0.95) !important; }
+.header-center .text-base-content\/50 { color: rgba(255,255,255,0.6) !important; }
+.header-center .text-base-content\/40 { color: rgba(255,255,255,0.55) !important; }
+.header-center .text-base-content\/30 { color: rgba(255,255,255,0.5) !important; }
+.header-center .text-warning { color: rgba(255,255,255,0.8) !important; }
+/* Range inputs: light styling on dark bg */
+.header-center .range { --range-shdw: rgba(255,255,255,0.4); }
+/* All buttons in header: white style (on orange bg) */
+.header-center .cp-btn-ghost {
+    color: rgba(255,255,255,0.9) !important;
+    border-color: rgba(255,255,255,0.4) !important;
+    background: rgba(255,255,255,0.15) !important;
+}
+.header-center .cp-btn-ghost:hover {
+    background: rgba(255,255,255,0.25) !important;
+    filter: none !important;
+}
+/* Play button: white on orange for max contrast */
+.header-center .cp-btn-primary {
+    background: rgba(255,255,255,0.95) !important;
+    border-color: transparent !important;
+    color: #ea580c !important;
+}
+.header-center .cp-btn-primary:hover {
+    background: #fff !important;
+    filter: none !important;
+}
+
+/* Remove page-main top padding — chord sticky section starts exactly
+   at its sticky threshold (top:88px = player header height). */
+.page-main { padding-top: 0 !important; }
+
+/* Sticky chord diagrams zone — sits just below player header (88px).
+   Background is required so scrolling lyrics don't bleed through. */
 .chords-sticky {
     position: sticky;
+    top: 88px;
     z-index: 29;
-    background: rgba(248, 250, 252, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-bottom: 1px solid #e2e8f0;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-    margin-left: -1.25rem;
-    margin-right: -1.25rem;
-    padding: 8px 1.25rem;
+    padding: 8px 20px;
     margin-bottom: 16px;
-}
-@media (min-width: 1024px) {
-    .chords-sticky { margin-left: -1.5rem; margin-right: -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; }
+    visibility: hidden;
+    background: #f8fafc;
 }
 [data-theme="dark"] .chords-sticky {
-    background: oklch(var(--b2) / 0.95);
-    border-bottom-color: oklch(var(--b3));
+    background: oklch(var(--b1));
 }
-
-/* Fade mask on right edge of chord strip */
-.chord-strip-wrapper {
-    position: relative;
-}
-.chord-strip-wrapper::after {
-    content: '';
-    position: absolute;
-    right: 0; top: 0; bottom: 8px;
-    width: 32px;
-    background: linear-gradient(to right, transparent, rgba(248,250,252,0.95));
-    pointer-events: none;
-}
-[data-theme="dark"] .chord-strip-wrapper::after {
-    background: linear-gradient(to right, transparent, oklch(var(--b2)));
+@media (min-width: 1024px) {
+    .chords-sticky { padding-left: 24px; padding-right: 24px; }
 }
 </style>
 {% endblock %}
 
-{% block nav_buttons %}
-<a href="/" class="cp-btn cp-btn-ghost cp-btn-sm gap-1">
-    <i data-lucide="arrow-left" class="w-4 h-4"></i>
-    Back
-</a>
-<a href="/song/{{ song.song_id }}/edit" class="cp-btn cp-btn-ghost cp-btn-sm gap-1">
-    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-    Edit Chords
-</a>
-{% endblock %}
+{% block header_center %}
+<div class="flex-1 flex flex-col items-center justify-center min-w-0 gap-1">
+
+    {% if audio_url %}
+    <audio id="audio-player" preload="auto">
+        <source src="{{ audio_url }}" type="audio/mpeg">
+    </audio>
+    {% endif %}
+
+    <!-- Row 1: Artist + Song title centered -->
+    <div class="text-center leading-snug">
+        <div class="text-sm font-bold text-base-content truncate">{{ parsed.artist }}</div>
+        <div class="text-xs text-base-content/50 truncate">{{ parsed.title }}</div>
+    </div>
+
+    <!-- Row 2: transport + seek + speed + auto-scroll -->
+    <div class="flex items-center gap-2 w-full max-w-lg px-2">
+        {% if audio_url %}
+        <button id="restart-btn" class="cp-btn cp-btn-ghost cp-btn-circle cp-btn-sm shrink-0" title="Restart">
+            <i data-lucide="skip-back" class="w-3.5 h-3.5"></i>
+        </button>
+        <button id="play-btn" class="cp-btn cp-btn-primary cp-btn-circle cp-btn-sm shrink-0">
+            <i data-lucide="play" class="w-4 h-4"></i>
+        </button>
+        <button id="pause-btn" class="cp-btn cp-btn-secondary cp-btn-circle cp-btn-sm hidden shrink-0">
+            <i data-lucide="pause" class="w-4 h-4"></i>
+        </button>
+        <span id="current-time" class="text-xs font-mono shrink-0 text-base-content/40 w-7 text-right">0:00</span>
+        <input type="range" id="seek-bar" class="range range-primary range-xs flex-1 min-w-0"
+               min="0" max="100" value="0" step="0.1" />
+        <span id="duration" class="text-xs font-mono shrink-0 text-base-content/40 w-7">0:00</span>
+        <div id="speed-control" class="items-center gap-1 shrink-0 hidden lg:flex">
+            <span class="text-xs text-base-content/30">slow</span>
+            <input type="range" id="scroll-speed" min="1" max="10" value="5" step="1"
+                   class="range range-primary range-xs w-14" />
+            <span class="text-xs text-base-content/30">fast</span>
+        </div>
+        <label class="flex items-center gap-1 cursor-pointer shrink-0">
+            <span class="text-xs text-base-content/40 hidden lg:inline">Auto-scroll</span>
+            <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-xs" checked />
+        </label>
+        {% else %}
+        <span class="text-xs text-warning">No audio file</span>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock header_center %}
 
 {% block content %}
+<!-- STICKY CHORD DIAGRAMS ZONE — full-width so background masks scrolling text -->
+<div id="chord-diagrams-section" class="chords-sticky">
+    <div class="max-w-4xl mx-auto">
+        <div id="chord-diagrams-strip" class="chord-diagrams-strip"></div>
+    </div>
+</div>
+
 <div class="max-w-4xl mx-auto">
-
-    <!-- STICKY PLAYER ZONE -->
-    <div class="player-sticky">
-        <!-- Song Info — pinned inside sticky zone -->
-        <div class="text-center mb-3">
-            <h1 class="text-2xl font-bold mb-0.5">{{ parsed.title }}</h1>
-            <p class="text-base-content/60 mb-1">{{ parsed.artist }}</p>
-            {% if parsed.key %}
-            <span class="badge badge-secondary">Key of {{ parsed.key }}</span>
-            {% endif %}
-        </div>
-        <div class="card player-card">
-            <div class="card-body py-4 px-5">
-                {% if audio_url %}
-                <!-- Hidden native audio element -->
-                <audio id="audio-player" preload="auto">
-                    <source src="{{ audio_url }}" type="audio/mpeg">
-                </audio>
-
-                <!-- Progress bar -->
-                <div class="flex items-center gap-3 mb-3">
-                    <span id="current-time" class="text-sm font-mono w-10 shrink-0">0:00</span>
-                    <input type="range" id="seek-bar" class="range range-primary range-xs flex-1"
-                           min="0" max="100" value="0" step="0.1" />
-                    <span id="duration" class="text-sm font-mono w-10 shrink-0 text-right">0:00</span>
-                </div>
-
-                <!-- Controls -->
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex gap-2">
-                        <button id="restart-btn" class="cp-btn cp-btn-ghost cp-btn-circle cp-btn-sm" title="Restart">
-                            <i data-lucide="skip-back" class="w-4 h-4"></i>
-                        </button>
-                        <button id="play-btn" class="cp-btn cp-btn-primary cp-btn-circle">
-                            <i data-lucide="play" class="w-5 h-5"></i>
-                        </button>
-                        <button id="pause-btn" class="cp-btn cp-btn-secondary cp-btn-circle hidden">
-                            <i data-lucide="pause" class="w-5 h-5"></i>
-                        </button>
-                    </div>
-
-                    <!-- Auto-scroll toggle + speed slider -->
-                    <div class="flex items-center gap-3">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <span class="text-sm font-medium">Auto-scroll</span>
-                            <input id="auto-scroll-toggle" type="checkbox" class="toggle toggle-primary toggle-sm" checked />
-                        </label>
-                        <div id="speed-control" class="flex items-center gap-1.5">
-                            <span class="text-xs text-base-content/40">slow</span>
-                            <input type="range" id="scroll-speed" min="1" max="10" value="5" step="1"
-                                   class="range range-primary range-xs w-20" title="Scroll speed" />
-                            <span class="text-xs text-base-content/40">fast</span>
-                        </div>
-                    </div>
-                </div>
-                {% else %}
-                <div class="alert alert-warning text-sm">
-                    <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
-                    <div>
-                        <p class="font-bold">Audio not available</p>
-                        <p>No audio file for this song. You can still view the chords below.</p>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- STICKY CHORD DIAGRAMS ZONE -->
-    <div id="chord-diagrams-section" class="chords-sticky hidden">
-        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-2">Chord Diagrams</h3>
-        <div class="chord-strip-wrapper">
-            <div id="chord-diagrams-strip" class="chord-diagrams-strip"></div>
-        </div>
-    </div>
-
     <!-- Chords & Lyrics -->
     <div id="song-content" class="song-content rounded-xl p-6 mb-4">
         {{ parsed.html | safe }}
@@ -261,13 +214,6 @@
 document.body.classList.add('player-page');
 // Set scroll speed BEFORE player.js loads so it overrides even cached versions
 window.cpScrollSpeed = 0.5;
-function updateStickyTops() {
-    var ps = document.querySelector('.player-sticky');
-    var cs = document.querySelector('.chords-sticky');
-    if (ps && cs) cs.style.top = (48 + ps.offsetHeight) + 'px';
-}
-document.addEventListener('DOMContentLoaded', updateStickyTops);
-window.addEventListener('resize', updateStickyTops);
 </script>
 <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 <script>
@@ -479,7 +425,6 @@ function renderChordDiagrams(chords) {
     const known = chords.filter(n => CHORD_DB[n] || CHORD_DB[n.replace('/', '')]);
     if (!known.length) return;
 
-    section.classList.remove('hidden');
     strip.innerHTML = '';
 
     known.forEach(name => {
@@ -504,6 +449,9 @@ function renderChordDiagrams(chords) {
         // Click to show large diagram
         wrap.addEventListener('click', () => showChordModal(name));
     });
+
+    // Reveal without layout shift (space was already reserved by visibility:hidden)
+    section.style.visibility = 'visible';
 }
 
 // ── Large chord modal ────────────────────────────────────────
@@ -582,11 +530,9 @@ document.addEventListener('DOMContentLoaded', () => {
     syncSpeedVisibility();
     autoScrollToggle2.addEventListener('change', syncSpeedVisibility);
 
-    // Render chord diagrams after a tick (let ChordPro HTML render)
-    setTimeout(() => {
-        const chords = extractChordsFromPage();
-        renderChordDiagrams(chords);
-    }, 50);
+    // Render chord diagrams immediately (ChordPro HTML is server-rendered)
+    const chords = extractChordsFromPage();
+    renderChordDiagrams(chords);
 });
 
 // Re-render diagrams on theme change
