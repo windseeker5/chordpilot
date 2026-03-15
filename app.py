@@ -668,7 +668,9 @@ def song_player(song_id):
         'player.html',
         song=song,
         parsed=parsed,
-        audio_url=audio_url if has_audio else None
+        audio_url=audio_url if has_audio else None,
+        tempo=parsed.get('tempo'),
+        strumming_patterns=parsed.get('strumming_patterns', []),
     )
 
 

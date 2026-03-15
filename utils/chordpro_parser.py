@@ -24,6 +24,20 @@ def parse_chordpro(file_path: str) -> Dict:
     title = re.search(r'\{title:\s*(.+?)\}', content, re.IGNORECASE)
     artist = re.search(r'\{artist:\s*(.+?)\}', content, re.IGNORECASE)
     key = re.search(r'\{key:\s*(.+?)\}', content, re.IGNORECASE)
+    tempo_match = re.search(r'\{tempo:\s*(\d+)\}', content, re.IGNORECASE)
+    tempo = int(tempo_match.group(1)) if tempo_match else None
+
+    # Extract strumming patterns (multiple allowed)
+    strumming_patterns = []
+    pending_label = None
+    for m in re.finditer(r'\{(strumming_label|strumming):\s*(.+?)\}', content, re.IGNORECASE):
+        directive = m.group(1).lower()
+        value = m.group(2).strip()
+        if directive == 'strumming_label':
+            pending_label = value
+        else:
+            strumming_patterns.append({'label': pending_label or '', 'pattern': value})
+            pending_label = None
 
     # Parse lines and convert to HTML
     html_lines = []
@@ -131,7 +145,9 @@ def parse_chordpro(file_path: str) -> Dict:
         'title': title.group(1) if title else 'Unknown',
         'artist': artist.group(1) if artist else 'Unknown',
         'key': key.group(1) if key else '',
-        'html': '\n'.join(html_lines)
+        'html': '\n'.join(html_lines),
+        'tempo': tempo,
+        'strumming_patterns': strumming_patterns,
     }
 
 

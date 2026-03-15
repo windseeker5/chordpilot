@@ -126,6 +126,75 @@
 @media (min-width: 1024px) {
     .chords-sticky { padding-left: 24px; padding-right: 24px; }
 }
+
+/* ── Strumming bar ── */
+.strum-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0 2px;
+    margin-top: 6px;
+    border-top: 1px solid oklch(var(--b3));
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.strum-bar::-webkit-scrollbar { display: none; }
+.strum-bpm {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: oklch(var(--bc) / 0.4);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.strum-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: oklch(var(--bc) / 0.35);
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.strum-pattern {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.strum-beat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    min-width: 16px;
+}
+.strum-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+}
+.strum-arrow {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.45);
+    line-height: 1.1;
+    transition: color 0.08s;
+}
+.strum-beat-label {
+    font-size: 0.55rem;
+    color: oklch(var(--bc) / 0.25);
+    font-family: monospace;
+    margin-top: 1px;
+}
+.strum-beat.strum-active .strum-arrow {
+    color: #f59e0b;
+}
+.strum-beat.strum-active .strum-beat-label {
+    color: #f59e0b;
+}
+[data-theme="light"] .strum-bar {
+    border-top-color: #e2e8f0;
+}
 </style>
 {% endblock %}
 
@@ -183,6 +252,35 @@
 <div id="chord-diagrams-section" class="chords-sticky">
     <div class="max-w-4xl mx-auto">
         <div id="chord-diagrams-strip" class="chord-diagrams-strip"></div>
+
+        {% if strumming_patterns %}
+        <div class="strum-bar" id="strum-bar">
+            {% if tempo %}
+            <span class="strum-bpm">♩ {{ tempo }} bpm</span>
+            {% endif %}
+            {% for pattern in strumming_patterns %}
+            {% if pattern.label %}
+            <span class="strum-label">{{ pattern.label }}</span>
+            {% endif %}
+            <div class="strum-pattern" data-pattern="{{ pattern.pattern }}">
+                {% set beats = pattern.pattern.split(' ') %}
+                {% for beat in beats %}
+                <div class="strum-beat" data-beat-index="{{ loop.index0 }}">
+                    <div class="strum-arrows">
+                        {% for stroke in beat %}
+                        <span class="strum-arrow">{% if stroke == 'D' %}↓{% elif stroke == 'U' %}↑{% endif %}</span>
+                        {% endfor %}
+                    </div>
+                    <span class="strum-beat-label">{{ loop.index }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not loop.last %}
+            <span style="color:oklch(var(--bc)/0.15);font-size:0.7rem">|</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -552,5 +650,56 @@ function formatTime(s) {
     if (isNaN(s) || s < 0) return '0:00';
     return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 }
+
+// ═══════════════════════════════════════════════════════════
+// STRUMMING BEAT ANIMATION (Phase 2)
+// Animates .strum-beat elements in sync with audio tempo.
+// Uses the first pattern's beat count as the loop length.
+// ═══════════════════════════════════════════════════════════
+(function() {
+    const tempo = {{ tempo | tojson }};
+    const audio = document.getElementById('audio-player');
+    if (!tempo || !audio) return;
+
+    const beatEls = Array.from(document.querySelectorAll('.strum-beat'));
+    if (!beatEls.length) return;
+
+    // Each space-separated group in the pattern = one quarter-note beat
+    const msPerBeat = (60000 / tempo);
+    let beatIndex = 0;
+    let intervalId = null;
+
+    function highlightBeat(idx) {
+        beatEls.forEach(el => el.classList.remove('strum-active'));
+        if (beatEls[idx]) beatEls[idx].classList.add('strum-active');
+    }
+
+    function startAnimation() {
+        if (intervalId) return;
+        // Snap beat index to current playhead position
+        beatIndex = Math.floor((audio.currentTime * 1000 / msPerBeat)) % beatEls.length;
+        highlightBeat(beatIndex);
+        intervalId = setInterval(() => {
+            beatIndex = (beatIndex + 1) % beatEls.length;
+            highlightBeat(beatIndex);
+        }, msPerBeat);
+    }
+
+    function stopAnimation() {
+        clearInterval(intervalId);
+        intervalId = null;
+        beatEls.forEach(el => el.classList.remove('strum-active'));
+    }
+
+    audio.addEventListener('play',   startAnimation);
+    audio.addEventListener('pause',  stopAnimation);
+    audio.addEventListener('ended',  stopAnimation);
+    audio.addEventListener('seeked', () => {
+        if (!audio.paused) {
+            stopAnimation();
+            startAnimation();
+        }
+    });
+})();
 </script>
 {% endblock %}
