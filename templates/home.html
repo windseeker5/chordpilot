@@ -196,6 +196,43 @@
     .section-block { margin-bottom: 3rem; }
     .hscroll { scrollbar-width: none; }
     .hscroll::-webkit-scrollbar { display: none; }
+
+    /* ── Chart panels: theme-aware classes ── */
+    .chart-item-title { font-size:0.8rem; font-weight:600; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    [data-theme="dark"] .chart-item-title { color: oklch(var(--bc)); }
+
+    .chart-item-artist { font-size:0.68rem; color:#94a3b8; margin-top:1px; }
+
+    .chart-score-badge { font-size:0.65rem;font-weight:700;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 6px;white-space:nowrap; }
+    [data-theme="dark"] .chart-score-badge { background:rgba(100,116,139,0.15); color:#94a3b8; }
+
+    .chart-listen-btn { display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s; }
+    .chart-listen-btn:hover { background:#dbeafe; }
+    [data-theme="dark"] .chart-listen-btn { background:rgba(59,130,246,0.12); color:#93c5fd; border-color:rgba(59,130,246,0.2); }
+    [data-theme="dark"] .chart-listen-btn:hover { background:rgba(59,130,246,0.18); }
+
+    .chart-search-btn { display:inline-flex;align-items:center;padding:3px 7px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s; }
+    .chart-search-btn:hover { background:#e2e8f0; }
+    [data-theme="dark"] .chart-search-btn { background:oklch(var(--b3)); color:oklch(var(--bc)/0.6); border-color:oklch(var(--b3)); }
+    [data-theme="dark"] .chart-search-btn:hover { background:oklch(var(--b3)/0.7); }
+
+    .chart-tab-type-badge { font-size:0.6rem;font-weight:600;color:#9ca3af;background:#f3f4f6;border-radius:3px;padding:1px 5px;white-space:nowrap; }
+    [data-theme="dark"] .chart-tab-type-badge { background:rgba(156,163,175,0.12); color:#9ca3af; }
+
+    .chart-hits-badge { font-size:0.65rem;font-weight:700;color:#78716c;background:#fff7ed;border-radius:4px;padding:2px 6px;white-space:nowrap; }
+    [data-theme="dark"] .chart-hits-badge { background:rgba(245,158,11,0.1); color:#fbbf24; }
+
+    .chart-tab-btn { display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#fff7ed;color:#f97316;border:1px solid #fed7aa;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s; }
+    .chart-tab-btn:hover { background:#ffedd5; }
+    [data-theme="dark"] .chart-tab-btn { background:rgba(249,115,22,0.12); color:#fb923c; border-color:rgba(249,115,22,0.2); }
+    [data-theme="dark"] .chart-tab-btn:hover { background:rgba(249,115,22,0.18); }
+
+    .guitar-chart-row { display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;transition:background 0.12s; }
+    .guitar-chart-row:hover { background:#fff7ed; }
+    [data-theme="dark"] .guitar-chart-row:hover { background:rgba(249,115,22,0.06); }
+
+    .chart-panel-title { font-size:0.8125rem;font-weight:700;color:#0f172a;letter-spacing:-0.01em; }
+    [data-theme="dark"] .chart-panel-title { color: oklch(var(--bc)); }
 </style>
 {% endblock %}
 
@@ -331,25 +368,21 @@
 
                         <!-- Info -->
                         <div style="min-width:0;flex:1;">
-                            <div style="font-size:0.8rem;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.title }}</div>
-                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:1px;">{{ t.artist }}</div>
+                            <div class="chart-item-title">{{ t.title }}</div>
+                            <div class="chart-item-artist">{{ t.artist }}</div>
                         </div>
 
                         <!-- Score + actions -->
                         <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
                             {% if t.score %}
-                            <span style="font-size:0.65rem;font-weight:700;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 6px;white-space:nowrap;" title="Deezer popularity score — proprietary metric, not stream count">score {{ t.score }}</span>
+                            <span class="chart-score-badge" title="Deezer popularity score — proprietary metric, not stream count">score {{ t.score }}</span>
                             {% endif %}
                             {% if t.link %}
-                            <a href="{{ t.link }}" target="_blank" rel="noopener"
-                               style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
-                               onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                            <a href="{{ t.link }}" target="_blank" rel="noopener" class="chart-listen-btn">
                                 <i data-lucide="headphones" style="width:9px;height:9px;"></i>Listen
                             </a>
                             {% endif %}
-                            <a href="/library?q={{ (t.title + ' ' + t.artist)|urlencode }}"
-                               style="display:inline-flex;align-items:center;padding:3px 7px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
-                               onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                            <a href="/library?q={{ (t.title + ' ' + t.artist)|urlencode }}" class="chart-search-btn">
                                 <i data-lucide="search" style="width:9px;height:9px;"></i>
                             </a>
                         </div>
@@ -370,7 +403,7 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #f97316;">
                     <div style="display:flex;align-items:center;gap:7px;">
                         <i data-lucide="music-4" style="width:14px;height:14px;color:#f97316;"></i>
-                        <span style="font-size:0.8125rem;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">Top Guitar Tabs · Daily</span>
+                        <span class="chart-panel-title">Top Guitar Tabs · Daily</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;color:#94a3b8;">
                         {% if guitar_chart and guitar_chart[0].source == 'Ultimate Guitar' %}
@@ -387,8 +420,7 @@
                 {% set ugfb = ['#f97316,#ef4444','#f59e0b,#f97316','#10b981,#f97316','#8b5cf6,#f97316','#3b82f6,#f97316','#ec4899,#f97316'] %}
                 <div style="display:flex;flex-direction:column;gap:3px;">
                     {% for t in guitar_chart %}
-                    <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;transition:background 0.12s;"
-                         onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='transparent'">
+                    <div class="guitar-chart-row">
                         <!-- Rank -->
                         <span style="font-family:'Roboto Slab',serif;font-size:0.8rem;font-weight:600;color:{% if t.rank <= 3 %}#f97316{% else %}#cbd5e1{% endif %};width:22px;text-align:right;flex-shrink:0;">#{{ t.rank }}</span>
 
@@ -407,28 +439,24 @@
 
                         <!-- Info -->
                         <div style="min-width:0;flex:1;">
-                            <div style="font-size:0.8rem;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.title }}</div>
-                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:1px;">{{ t.artist }}</div>
+                            <div class="chart-item-title">{{ t.title }}</div>
+                            <div class="chart-item-artist">{{ t.artist }}</div>
                         </div>
 
                         <!-- Views + actions -->
                         <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
                             {% if t.tab_type %}
-                            <span style="font-size:0.6rem;font-weight:600;color:#9ca3af;background:#f3f4f6;border-radius:3px;padding:1px 5px;white-space:nowrap;">{{ t.tab_type }}</span>
+                            <span class="chart-tab-type-badge">{{ t.tab_type }}</span>
                             {% endif %}
                             {% if t.hits %}
-                            <span style="font-size:0.65rem;font-weight:700;color:#78716c;background:#fff7ed;border-radius:4px;padding:2px 6px;white-space:nowrap;" title="Daily hits on Ultimate Guitar">{{ t.hits }}</span>
+                            <span class="chart-hits-badge" title="Daily hits on Ultimate Guitar">{{ t.hits }}</span>
                             {% endif %}
                             {% if t.tab_url %}
-                            <a href="{{ t.tab_url }}" target="_blank" rel="noopener"
-                               style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#fff7ed;color:#f97316;border:1px solid #fed7aa;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
-                               onmouseover="this.style.background='#ffedd5'" onmouseout="this.style.background='#fff7ed'">
+                            <a href="{{ t.tab_url }}" target="_blank" rel="noopener" class="chart-tab-btn">
                                 <i data-lucide="external-link" style="width:9px;height:9px;"></i>Tab
                             </a>
                             {% endif %}
-                            <a href="/library?q={{ (t.title + ' ' + t.artist)|urlencode }}"
-                               style="display:inline-flex;align-items:center;padding:3px 7px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;font-size:0.65rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background 0.1s;"
-                               onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                            <a href="/library?q={{ (t.title + ' ' + t.artist)|urlencode }}" class="chart-search-btn">
                                 <i data-lucide="search" style="width:9px;height:9px;"></i>
                             </a>
                         </div>

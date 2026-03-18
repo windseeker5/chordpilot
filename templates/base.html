@@ -18,12 +18,26 @@
         :root,
         [data-theme="light"] { --p: 0.666 0.179 58; --pf: 0.554 0.152 59; }
 
+        [data-theme="dark"] {
+            --b1: 0.12 0.008 55;
+            --b2: 0.16 0.010 50;
+            --b3: 0.21 0.012 50;
+            --bc: 0.91 0.012 58;
+            --p:  0.75 0.155 60;
+            --pf: 0.65 0.170 58;
+        }
+
         /* ── Layout ── */
         html, body { background: #f9fafb !important; font-size: 14px; }
         [data-theme="dark"] html,
         [data-theme="dark"] body { background: oklch(var(--b1)) !important; }
 
         /* ── Global Header ── */
+        [data-theme="dark"] .global-header {
+            background: #1e1b18;
+            border-bottom: 1px solid rgba(245, 158, 11, 0.18);
+        }
+
         .global-header {
             height: 60px;
             background: linear-gradient(135deg, #f59e0b, #ea580c);
