@@ -211,29 +211,33 @@
 
         /* ── Guitar Tab block ── */
         .tab-section {
-            background: #1e293b;
+            background: #1c1006;
             border-radius: 10px;
             padding: 1rem 1.25rem;
             margin: 1rem 0 1.5rem;
             overflow-x: auto;
-            border: 1px solid rgba(255,255,255,0.06);
+            border: 1px solid rgba(217,119,6,0.22);
         }
         .tab-label {
             font-size: 0.6875rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.07em;
-            color: #94a3b8;
+            color: #b87620;
             margin-bottom: 0.625rem;
         }
         .tab-pre {
             font-family: 'Fira Mono', 'Courier New', monospace;
             font-size: 0.875rem;
             line-height: 1.8;
-            color: #e2e8f0;
+            color: #f2e0b8;
             white-space: pre;
             margin: 0;
             overflow-x: auto;
+        }
+        [data-theme="dark"] .tab-section {
+            background: #130c04;
+            border-color: rgba(217,119,6,0.15);
         }
 
         /* ── Section labels ── */
@@ -597,5 +601,95 @@ function toggleMobileSidebar() {
 </script>
 
 {% block extra_scripts %}{% endblock %}
+
+<!-- ── KD Confirm Modal ─────────────────────── -->
+<dialog id="kd-confirm-modal" class="modal">
+    <div class="modal-box">
+        <h3 id="kd-confirm-title" class="font-bold text-lg"></h3>
+        <p id="kd-confirm-msg" class="py-4 text-sm"></p>
+        <div class="modal-action">
+            <button id="kd-confirm-cancel" class="btn btn-sm">Cancel</button>
+            <button id="kd-confirm-ok" class="btn btn-sm btn-error">Delete</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ── KD Toast + Confirm globals ───────────── -->
+<script>
+(function() {
+    function getContainer(position) {
+        var id = 'kd-toast-container-' + position;
+        var c = document.getElementById(id);
+        if (!c) {
+            c = document.createElement('div');
+            c.id = id;
+            c.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+            document.body.appendChild(c);
+        }
+        return c;
+    }
+
+    window.kdShowAlert = function(type, message, opts) {
+        opts = opts || {};
+        var duration = opts.duration !== undefined ? opts.duration : 4000;
+        var position = opts.position || 'top-right';
+        var dismissable = opts.dismissable !== false;
+
+        var colorMap = {
+            success: { bg:'#22c55e', icon:'✓' },
+            error:   { bg:'#ef4444', icon:'✕' },
+            warning: { bg:'#f59e0b', icon:'⚠' },
+            info:    { bg:'#3b82f6', icon:'ℹ' }
+        };
+        var cfg = colorMap[type] || colorMap.info;
+
+        var toast = document.createElement('div');
+        toast.style.cssText = 'pointer-events:auto;background:' + cfg.bg + ';color:#fff;padding:10px 14px;border-radius:8px;font-size:0.875rem;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,0.18);min-width:220px;max-width:360px;opacity:0;transform:translateX(24px);transition:opacity 0.22s,transform 0.22s;';
+        toast.innerHTML = '<span style="font-weight:700;flex-shrink:0;">' + cfg.icon + '</span><span style="flex:1;">' + message + '</span>';
+        if (dismissable) {
+            var x = document.createElement('button');
+            x.textContent = '×';
+            x.style.cssText = 'background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;padding:0 0 0 6px;opacity:0.8;flex-shrink:0;line-height:1;';
+            x.onclick = function() { dismiss(toast); };
+            toast.appendChild(x);
+        }
+
+        var container = getContainer(position);
+        container.appendChild(toast);
+
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            });
+        });
+
+        function dismiss(el) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(24px)';
+            setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 240);
+        }
+
+        if (duration > 0) {
+            setTimeout(function() { dismiss(toast); }, duration);
+        }
+    };
+
+    window.kdConfirm = function(title, message, onConfirm) {
+        var modal = document.getElementById('kd-confirm-modal');
+        document.getElementById('kd-confirm-title').textContent = title;
+        document.getElementById('kd-confirm-msg').textContent = message;
+        var okBtn = document.getElementById('kd-confirm-ok');
+        var newOk = okBtn.cloneNode(true);
+        okBtn.parentNode.replaceChild(newOk, okBtn);
+        newOk.addEventListener('click', function() {
+            modal.close();
+            onConfirm();
+        });
+        modal.showModal();
+    };
+})();
+</script>
 </body>
 </html>

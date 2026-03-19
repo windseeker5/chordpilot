@@ -254,7 +254,9 @@
         {% if strumming_patterns %}
         <div class="strum-bar" id="strum-bar">
             {% if tempo %}
-            <span class="strum-bpm">♩ {{ tempo }} bpm</span>
+            <button id="strum-play-btn" title="Preview strumming pattern"
+                    style="width:26px;height:26px;border-radius:50%;border:1.5px solid oklch(var(--p));background:transparent;color:oklch(var(--p));cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0;transition:background 0.15s;">▶</button>
+            <span class="strum-bpm">{{ tempo }} bpm</span>
             {% endif %}
             {% for pattern in strumming_patterns %}
             {% if pattern.label %}
@@ -355,6 +357,7 @@ const CHORD_DB = {
     'Dmaj7':{ frets: [-1,-1,0,2,2,2] },
     'Emaj7':{ frets: [0,2,1,1,0,0] },
     'Bmaj7':{ frets: [-1,2,4,3,4,2], barre:{fret:2,from:1,to:5} },
+    'F#':  { frets: [2,4,4,3,2,2], barre:{fret:2,from:0,to:5} },
     'F#m': { frets: [2,4,4,2,2,2], barre:{fret:2,from:0,to:5} },
     'F#m7':{ frets: [2,4,2,2,2,2], barre:{fret:2,from:0,to:5} },
     'C#m': { frets: [-1,4,6,6,5,4], barre:{fret:4,from:1,to:5} },
@@ -650,56 +653,102 @@ function formatTime(s) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STRUMMING BEAT ANIMATION
-// Each .strum-pattern animates independently at the same BPM.
+// STRUMMING BEAT ANIMATION + STANDALONE METRONOME
 // ═══════════════════════════════════════════════════════════
 (function() {
     const tempo = {{ tempo | tojson }};
-    const audio = document.getElementById('audio-player');
-    if (!tempo || !audio) return;
+    if (!tempo) return;
 
+    const audio    = document.getElementById('audio-player');
+    const playBtn  = document.getElementById('strum-play-btn');
     const patternEls = Array.from(document.querySelectorAll('.strum-pattern'));
     if (!patternEls.length) return;
 
-    const patterns = patternEls.map(patEl => ({
-        beats: Array.from(patEl.querySelectorAll('.strum-beat')),
-        index: 0
-    }));
-
     const msPerBeat = 60000 / tempo;
-    let intervalId = null;
 
-    function highlightAll() {
+    // Each pattern fills one bar of 4/4 → msPerSlot = (4 beats × msPerBeat) / numSlots
+    // e.g. 4-slot pattern → quarter notes; 8-slot pattern → eighth notes
+    const patterns = patternEls.map(patEl => {
+        const beats = Array.from(patEl.querySelectorAll('.strum-beat'));
+        const msPerSlot = (msPerBeat * 4) / Math.max(beats.length, 1);
+        return { beats, msPerSlot };
+    });
+
+    // ── Highlight helpers ────────────────────────────────
+    function highlightAt(elapsedMs) {
         patterns.forEach(p => {
             p.beats.forEach(el => el.classList.remove('strum-active'));
-            if (p.beats[p.index]) p.beats[p.index].classList.add('strum-active');
+            const idx = Math.floor(elapsedMs / p.msPerSlot) % p.beats.length;
+            if (p.beats[idx]) p.beats[idx].classList.add('strum-active');
         });
     }
-
-    function tick() {
-        const elapsed = audio.currentTime * 1000;
-        patterns.forEach(p => {
-            p.index = Math.floor(elapsed / msPerBeat) % p.beats.length;
-        });
-        highlightAll();
-    }
-
-    function startAnimation() {
-        if (intervalId) return;
-        tick();
-        intervalId = setInterval(tick, msPerBeat);
-    }
-
-    function stopAnimation() {
-        clearInterval(intervalId);
-        intervalId = null;
+    function clearHighlights() {
         patterns.forEach(p => p.beats.forEach(el => el.classList.remove('strum-active')));
     }
 
-    audio.addEventListener('play',   startAnimation);
-    audio.addEventListener('pause',  stopAnimation);
-    audio.addEventListener('ended',  stopAnimation);
-    audio.addEventListener('seeked', () => { if (!audio.paused) { stopAnimation(); startAnimation(); } });
+    // ── Song audio sync ──────────────────────────────────
+    let songPollId = null;
+    function startSongSync() {
+        if (songPollId) return;
+        songPollId = setInterval(() => { if (audio) highlightAt(audio.currentTime * 1000); }, 50);
+    }
+    function stopSongSync() {
+        clearInterval(songPollId); songPollId = null; clearHighlights();
+    }
+    if (audio) {
+        audio.addEventListener('play',   startSongSync);
+        audio.addEventListener('pause',  stopSongSync);
+        audio.addEventListener('ended',  stopSongSync);
+        audio.addEventListener('seeked', () => { if (!audio.paused) { stopSongSync(); startSongSync(); } });
+    }
+
+    // ── Standalone metronome with Web Audio click ────────
+    let metronomeId  = null;
+    let metroStart   = null;
+    let audioCtx     = null;
+    let lastSlot     = -1;
+    const slotMs     = patterns[0]?.msPerSlot || msPerBeat;
+    const numSlots   = patterns[0]?.beats.length || 4;
+
+    function click(accent) {
+        if (!audioCtx) return;
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = accent ? 1000 : 660;
+        gain.gain.setValueAtTime(accent ? 0.45 : 0.28, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.07);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+    }
+
+    function startMetronome() {
+        audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
+        metroStart = performance.now();
+        lastSlot   = -1;
+        metronomeId = setInterval(() => {
+            const elapsed = performance.now() - metroStart;
+            const slot = Math.floor(elapsed / slotMs) % numSlots;
+            highlightAt(elapsed);
+            if (slot !== lastSlot) { click(slot === 0); lastSlot = slot; }
+        }, 20);
+        if (playBtn) { playBtn.textContent = '⏹'; playBtn.title = 'Stop preview'; }
+    }
+
+    function stopMetronome() {
+        clearInterval(metronomeId); metronomeId = null;
+        if (audioCtx) { audioCtx.close(); audioCtx = null; }
+        clearHighlights();
+        if (playBtn) { playBtn.textContent = '▶'; playBtn.title = 'Preview strumming pattern'; }
+    }
+
+    if (playBtn) {
+        playBtn.addEventListener('click', () => {
+            if (metronomeId) stopMetronome(); else startMetronome();
+        });
+        playBtn.addEventListener('mouseover', () => { playBtn.style.background = 'oklch(var(--p)/0.12)'; });
+        playBtn.addEventListener('mouseout',  () => { playBtn.style.background = 'transparent'; });
+    }
 })();
 </script>
 {% endblock %}

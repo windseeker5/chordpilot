@@ -19,7 +19,9 @@ instance/
 
 # User settings and data
 settings.json
-static/songs/
+static/songs/**/*.mp3
+static/songs/**/*.mp4
+static/songs/**/*.webm
 
 # IDE
 .vscode/

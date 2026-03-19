@@ -23,7 +23,8 @@ _GARBAGE_RE = re.compile(
 )
 
 # All-caps no-space blobs like "BFEB" — transposition indicators, navigation cruft
-_ALLCAPS_BLOB_RE = re.compile(r'^[A-G#b]{2,10}$')
+# Minimum 3 chars: 2-char strings (F#, Eb, Ab…) are valid chord names, not garbage
+_ALLCAPS_BLOB_RE = re.compile(r'^[A-G#b]{3,10}$')
 
 def _is_garbage_line(line: str) -> bool:
     s = line.strip()
@@ -73,7 +74,7 @@ def is_chord_line(line: str) -> bool:
         return False
 
     # Chord pattern: C, Am, F#m, Gsus4, Cmaj7, D/F#, etc.
-    chord_pattern = r'\b[A-G](#|b)?(m|maj|min|dim|aug|sus)?(2|4|5|6|7|9|11|13)?(/[A-G](#|b)?)?\b'
+    chord_pattern = r'\b[A-G][#b]?(?:m|maj|min|dim|aug|sus)?(?:2|4|5|6|7|9|11|13)?(?:/[A-G][#b]?)?(?![a-zA-Z0-9])'
 
     # Find all chord matches
     matches = re.findall(chord_pattern, line)
@@ -112,7 +113,7 @@ def merge_chords_and_lyrics(chord_line: str, lyric_line: str) -> str:
         ChordPro formatted line with inline chords
     """
     # Find all chords and their positions
-    chord_pattern = r'\b[A-G](#|b)?(m|maj|min|dim|aug|sus)?(2|4|5|6|7|9|11|13)?(/[A-G](#|b)?)?\b'
+    chord_pattern = r'\b[A-G][#b]?(?:m|maj|min|dim|aug|sus)?(?:2|4|5|6|7|9|11|13)?(?:/[A-G][#b]?)?(?![a-zA-Z0-9])'
     chords: List[Tuple[int, str]] = []
 
     for match in re.finditer(chord_pattern, chord_line):
@@ -244,15 +245,19 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
     lines = [l for l in raw_text.split('\n') if not _is_garbage_line(l)]
     chordpro_lines = []
 
-    # Add metadata headers
-    if title:
+    # Only add metadata headers if not already present in the raw text
+    has_title = bool(re.search(r'\{title\s*:', raw_text, re.IGNORECASE))
+    has_artist = bool(re.search(r'\{artist\s*:', raw_text, re.IGNORECASE))
+    has_key = bool(re.search(r'\{key\s*:', raw_text, re.IGNORECASE))
+
+    if title and not has_title:
         chordpro_lines.append(f'{{title: {title}}}')
-    if artist:
+    if artist and not has_artist:
         chordpro_lines.append(f'{{artist: {artist}}}')
-    if key:
+    if key and not has_key:
         chordpro_lines.append(f'{{key: {key}}}')
 
-    if title or artist or key:
+    if (title and not has_title) or (artist and not has_artist) or (key and not has_key):
         chordpro_lines.append('')  # Blank line after headers
 
     # Tab line pattern: e|---, E|---, B|---, G|---, D|---, A|---, or sequences of -|0-9phb/\
@@ -273,6 +278,12 @@ def convert_raw_to_chordpro(raw_text: str, title: str = '', artist: str = '', ke
 
     while i < len(lines):
         line = lines[i]
+
+        # Pass through existing ChordPro directives verbatim (tempo, strumming, key, title, etc.)
+        if re.match(r'^\s*\{[^}]+\}', line):
+            chordpro_lines.append(line.rstrip())
+            i += 1
+            continue
 
         # Check for section markers like [Verse], [Chorus], [Bridge]…
         section_type, section_label = detect_section_marker(line)

@@ -690,8 +690,9 @@ def song_editor(song_id):
         if not content:
             return jsonify({'error': 'No content to save'}), 400
 
-        # Auto-convert raw UG tab format → ChordPro if no directives
-        if not re.search(r'\{(title|artist|start_of|end_of|key)\s*:', content, re.IGNORECASE):
+        # Auto-convert raw UG tab format → ChordPro unless already fully converted
+        # (fully converted = has {start_of_...}/{end_of_...} section blocks)
+        if not re.search(r'\{(start_of|end_of)_', content, re.IGNORECASE):
             from utils.chord_converter import convert_raw_to_chordpro
             content = convert_raw_to_chordpro(
                 content,
@@ -727,8 +728,8 @@ def api_preview_chords():
     if not content:
         return jsonify({'html': ''})
 
-    # Auto-convert raw UG tab format → ChordPro if no directives present
-    if not re.search(r'\{(title|artist|start_of|end_of|key)\s*:', content, re.IGNORECASE):
+    # Auto-convert raw UG tab format → ChordPro unless already fully converted
+    if not re.search(r'\{(start_of|end_of)_', content, re.IGNORECASE):
         from utils.chord_converter import convert_raw_to_chordpro
         content = convert_raw_to_chordpro(content)
 

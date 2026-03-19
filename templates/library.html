@@ -545,7 +545,7 @@ async function searchSongs() {
         youtubeResultsData = await ytRes.json();
         displayYoutubeResults(youtubeResultsData);
         lucide.createIcons();
-    } catch (err) { alert('Search failed. Please try again.'); }
+    } catch (err) { kdShowAlert('error', 'Search failed. Please try again.'); }
 }
 
 function displayYoutubeResults(results) {
@@ -571,7 +571,7 @@ function selectYoutube(i) {
 }
 
 async function addSelectedSong() {
-    if (!selectedYoutube) { alert('Select a YouTube video first.'); return; }
+    if (!selectedYoutube) { kdShowAlert('error', 'Select a YouTube video first.'); return; }
     var sq = document.getElementById('searchInput').value.trim();
     var data = {
         title: selectedYoutube.title || 'Unknown',
@@ -586,20 +586,23 @@ async function addSelectedSong() {
         var result = await res.json();
         if (result.success) {
             closeAddSongModal();
-            alert('Song added! Download in progress…');
-            location.reload();
-        } else { alert('Error: ' + result.error); }
-    } catch(e) { alert('Failed to add song.'); }
+            kdShowAlert('success', 'Song added! Download in progress…');
+            setTimeout(() => location.reload(), 1400);
+        } else { kdShowAlert('error', 'Error: ' + result.error); }
+    } catch(e) { kdShowAlert('error', 'Failed to add song.'); }
 }
 
 async function deleteSong(songId, title) {
-    if (!confirm('Delete "' + title + '"? This cannot be undone.')) return;
-    try {
-        var res = await fetch('/library/delete/' + songId, {method:'POST'});
-        var result = await res.json();
-        if (result.success) location.reload();
-        else alert('Error: ' + result.error);
-    } catch(e) { alert('Failed to delete song.'); }
+    kdConfirm('Delete Song', 'Delete "' + title + '"? This cannot be undone.', async function() {
+        try {
+            var res = await fetch('/library/delete/' + songId, {method:'POST'});
+            var result = await res.json();
+            if (result.success) {
+                kdShowAlert('success', '"' + title + '" deleted.');
+                setTimeout(() => location.reload(), 1400);
+            } else kdShowAlert('error', 'Error: ' + result.error);
+        } catch(e) { kdShowAlert('error', 'Failed to delete song.'); }
+    });
 }
 
 function showManualChordsModal(songId, title, artist, searchQuery) {
@@ -613,20 +616,20 @@ function showManualChordsModal(songId, title, artist, searchQuery) {
     lucide.createIcons();
 }
 function closeManualChordsModal() { document.getElementById('manualChordsModal').close(); currentSongId = null; }
-function skipManualChords() { closeManualChordsModal(); alert('Song added! You can add chords later.'); location.reload(); }
+function skipManualChords() { closeManualChordsModal(); kdShowAlert('success', 'Song added! You can add chords later.'); setTimeout(() => location.reload(), 1400); }
 
 async function convertAndSaveChords() {
     var rawChords = document.getElementById('rawChordsInput').value.trim();
-    if (!rawChords) { alert('Please paste some chords first!'); return; }
-    if (!currentSongId) { alert('Error: No song ID found'); return; }
+    if (!rawChords) { kdShowAlert('error', 'Please paste some chords first.'); return; }
+    if (!currentSongId) { kdShowAlert('error', 'No song ID found.'); return; }
     try {
         var res = await fetch('/library/manual-chords/' + currentSongId, {
             method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({raw_chords: rawChords})
         });
         var result = await res.json();
-        if (result.success) { closeManualChordsModal(); alert('Chords saved!'); location.reload(); }
-        else alert('Error: ' + result.error);
-    } catch(e) { alert('Failed to save chords.'); }
+        if (result.success) { closeManualChordsModal(); kdShowAlert('success', 'Chords saved!'); setTimeout(() => location.reload(), 1400); }
+        else kdShowAlert('error', 'Error: ' + result.error);
+    } catch(e) { kdShowAlert('error', 'Failed to save chords.'); }
 }
 
 async function checkOllamaStatus() {
@@ -747,7 +750,7 @@ function showAddTutorialModal() {
 async function submitAddTutorial() {
     var url  = (document.getElementById('tutorialUrl').value || '').trim();
     var hint = (document.getElementById('tutorialHint').value || '').trim();
-    if (!url) { alert('Please enter a URL'); return; }
+    if (!url) { kdShowAlert('error', 'Please enter a URL.'); return; }
 
     var spinner = document.getElementById('tutorialSpinner');
     var errDiv  = document.getElementById('tutorialError');
@@ -810,13 +813,14 @@ function closeLightbox() {
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
 
 async function deleteTutorial(id, btn) {
-    if (!confirm('Delete this tutorial?')) return;
-    try {
-        var res = await fetch('/api/tutorials/' + id, {method: 'DELETE'});
-        var data = await res.json();
-        if (data.success) { _tutorialsLoaded = false; loadTutorials(); }
-        else alert('Failed to delete tutorial');
-    } catch(e) { alert('Network error'); }
+    kdConfirm('Delete Tutorial', 'Delete this tutorial?', async function() {
+        try {
+            var res = await fetch('/api/tutorials/' + id, {method: 'DELETE'});
+            var data = await res.json();
+            if (data.success) { _tutorialsLoaded = false; loadTutorials(); }
+            else kdShowAlert('error', 'Failed to delete tutorial.');
+        } catch(e) { kdShowAlert('error', 'Network error.'); }
+    });
 }
 
 // ── Edit Song Info ────────────────────────────────
@@ -837,7 +841,7 @@ async function saveEditInfo() {
     var title = document.getElementById('edit-info-title').value.trim();
     var artist = document.getElementById('edit-info-artist').value.trim();
     var key = document.getElementById('edit-info-key').value.trim();
-    if (!title) { alert('Title is required.'); return; }
+    if (!title) { kdShowAlert('error', 'Title is required.'); return; }
     try {
         var res = await fetch('/library/update-song-info/' + _editInfoSongId, {
             method: 'POST',
@@ -858,8 +862,8 @@ async function saveEditInfo() {
                     if (artistEl) artistEl.textContent = artist || '—';
                 }
             });
-        } else { alert('Error: ' + (result.error || 'Unknown error')); }
-    } catch(e) { alert('Failed to save.'); }
+        } else { kdShowAlert('error', 'Error: ' + (result.error || 'Unknown error')); }
+    } catch(e) { kdShowAlert('error', 'Failed to save.'); }
 }
 </script>
 

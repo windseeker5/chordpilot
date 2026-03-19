@@ -119,8 +119,15 @@
         <!-- LEFT: editor -->
         <div style="display:flex;flex-direction:column;">
             <div class="editor-col-label">ChordPro / Tab Input</div>
-            <textarea id="chord-editor" spellcheck="false"
-                      placeholder="{title: My Song}&#10;{artist: Artist Name}&#10;{key: G}&#10;&#10;{start_of_verse}&#10;[G]Here are some [Em]chords&#10;[C]and lyrics [D]below&#10;{end_of_verse}">{{ content | e }}</textarea>
+            <textarea id="chord-editor" spellcheck="false">{% if content %}{{ content | e }}{% else %}{title: Song Title}
+{artist: Artist Name}
+{key: }
+{tempo: 120}
+
+{strumming_label: Main pattern}
+{strumming: D DU U DU}
+
+Paste Ultimate Guitar tab here…{% endif %}</textarea>
         </div>
 
         <!-- RIGHT: preview -->
@@ -217,7 +224,7 @@ editor.addEventListener('input', function() {
 // ── Save ──────────────────────────────────────────
 async function saveChords() {
     var content = editor.value.trim();
-    if (!content) { alert('Nothing to save.'); return; }
+    if (!content) { kdShowAlert('error', 'Nothing to save.'); return; }
 
     var btn = document.getElementById('save-btn');
     btn.disabled = true;
@@ -240,10 +247,10 @@ async function saveChords() {
                 saveStatus.style.opacity = '0';
             }, 2500);
         } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
+            kdShowAlert('error', 'Error: ' + (data.error || 'Unknown error'));
         }
     } catch(e) {
-        alert('Failed to save. Check the server.');
+        kdShowAlert('error', 'Failed to save. Check the server.');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="save" style="width:14px;height:14px;"></i> Save';

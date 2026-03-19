@@ -198,14 +198,11 @@ async function saveSettings() {
         const statusDiv = document.getElementById('connectionStatus');
         const statusMsg = document.getElementById('statusMessage');
         if (result.success) {
-            statusDiv.className = 'alert alert-success mb-4 text-sm';
-            statusMsg.textContent = '✓ Settings saved!';
-            statusDiv.classList.remove('hidden');
-            setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+            kdShowAlert('success', '✓ Settings saved!');
         } else {
-            alert('Error: ' + result.error);
+            kdShowAlert('error', 'Error: ' + result.error);
         }
-    } catch(e) { alert('Failed to save: ' + e.message); }
+    } catch(e) { kdShowAlert('error', 'Failed to save: ' + e.message); }
     lucide.createIcons();
 }
 
