@@ -73,8 +73,8 @@ def is_chord_line(line: str) -> bool:
     if _cp_bracket.search(line):
         return False
 
-    # Chord pattern: C, Am, F#m, Gsus4, Cmaj7, D/F#, etc.
-    chord_pattern = r'\b[A-G][#b]?(?:m|maj|min|dim|aug|sus)?(?:2|4|5|6|7|9|11|13)?(?:/[A-G][#b]?)?(?![a-zA-Z0-9])'
+    # Chord pattern: C, Am, F#m, Gsus4, Cmaj7, B7sus4, D/F#, etc.
+    chord_pattern = r'\b[A-G][#b]?(?:maj|min|m|dim|aug|add)?(?:\d+)?(?:sus\d+)?(?:/[A-G][#b]?)?(?![a-zA-Z0-9])'
 
     # Find all chord matches
     matches = re.findall(chord_pattern, line)
@@ -113,7 +113,7 @@ def merge_chords_and_lyrics(chord_line: str, lyric_line: str) -> str:
         ChordPro formatted line with inline chords
     """
     # Find all chords and their positions
-    chord_pattern = r'\b[A-G][#b]?(?:m|maj|min|dim|aug|sus)?(?:2|4|5|6|7|9|11|13)?(?:/[A-G][#b]?)?(?![a-zA-Z0-9])'
+    chord_pattern = r'\b[A-G][#b]?(?:maj|min|m|dim|aug|add)?(?:\d+)?(?:sus\d+)?(?:/[A-G][#b]?)?(?![a-zA-Z0-9])'
     chords: List[Tuple[int, str]] = []
 
     for match in re.finditer(chord_pattern, chord_line):

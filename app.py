@@ -457,6 +457,9 @@ def create_basic_chordpro(filepath, title, artist, key=''):
         content += f"{{key: {key}}}\n"
 
     content += """
+{strumming_label: Main Pattern}
+{strumming: D DU UDU}
+
 {start_of_verse}
 Add your [C]chords and [G]lyrics [Am]here
 Edit this file to add the [F]actual chords
@@ -480,10 +483,8 @@ def create_manual_entry_template(filepath, title, artist, key=''):
         content += f"{{key: {key}}}\n"
 
     content += f"""
-{{comment: Chords could not be automatically fetched}}
-{{comment: Please add chords manually by editing this file}}
-{{comment: Visit Ultimate Guitar or similar site to get the chords}}
-{{comment: Format: Put chords in [brackets] before the syllable}}
+{{strumming_label: Main Pattern}}
+{{strumming: D DU UDU}}
 
 {{start_of_verse}}
 [C]Example: Put chords in [G]brackets like [Am]this
@@ -493,12 +494,6 @@ Replace this with actual [F]lyrics and chords
 {{start_of_chorus}}
 [C]Chorus [G]goes [Am]here [F]
 {{end_of_chorus}}
-
-{{comment: Quick reference:}}
-{{comment: - Major chords: C, D, E, F, G, A, B}}
-{{comment: - Minor chords: Cm, Dm, Em, Fm, Gm, Am, Bm}}
-{{comment: - 7th chords: C7, D7, E7, etc.}}
-{{comment: - Example line: "When I [C]find my[G]self in [Am]times of [F]trouble"}}
 """
 
     with open(filepath, 'w') as f:

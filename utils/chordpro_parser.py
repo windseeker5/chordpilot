@@ -153,7 +153,7 @@ def parse_chordpro(file_path: str) -> Dict:
 
 # Valid chord name: must start with a note letter (A-G) + optional modifiers
 _CHORD_NAME_RE = re.compile(
-    r'^[A-G][#b]?(?:m(?:aj)?|min|dim|aug|sus|add)?(?:\d+)?(?:/[A-G][#b]?)?$'
+    r'^[A-G][#b]?(?:maj|min|m|dim|aug|add)?(?:\d+)?(?:sus\d+)?(?:/[A-G][#b]?)?$'
 )
 
 

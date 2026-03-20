@@ -370,11 +370,20 @@ const CHORD_DB = {
     'Dm7': { frets: [-1,-1,0,2,1,1] },
     'Em7': { frets: [0,2,2,0,3,0] },
     'Cm7': { frets: [-1,3,5,3,4,3], barre:{fret:3,from:1,to:5} },
+    'B7sus4':{ frets: [-1,2,4,2,0,0] },
+    // Slash chords
+    'D/F#':  { frets: [2,5,4,2,3,2], barre:{fret:2,from:0,to:5} },
+    'Am/E':  { frets: [0,0,2,2,1,0] },
+    'A7sus4':{ frets: [-1,0,2,0,3,0] },
+    'G/B':   { frets: [-1,2,0,0,0,3] },
+    'C/E':   { frets: [0,3,2,0,1,0] },
+    'F/C':   { frets: [-1,3,3,2,1,1], barre:{fret:1,from:1,to:5} },
+    'E/B':   { frets: [-1,2,2,1,0,0] },
 };
 
 // ── Draw chord diagram on a canvas ──────────────────────────
 function drawChordDiagram(canvas, chordName, compact=false) {
-    const chordData = CHORD_DB[chordName] || CHORD_DB[chordName.replace('/', '')] || null;
+    const chordData = CHORD_DB[chordName] || CHORD_DB[chordName.split('/')[0]] || null;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -521,7 +530,7 @@ function renderChordDiagrams(chords) {
     const strip = document.getElementById('chord-diagrams-strip');
 
     // Only show chords we have fingering data for — skip unknowns
-    const known = chords.filter(n => CHORD_DB[n] || CHORD_DB[n.replace('/', '')]);
+    const known = chords.filter(n => CHORD_DB[n] || CHORD_DB[n.split('/')[0]]);
     if (!known.length) return;
 
     strip.innerHTML = '';
